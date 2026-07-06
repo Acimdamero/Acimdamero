@@ -32,6 +32,7 @@ Commands:
   waha-send <phone> <msg>       Kirim WA via WAHA self-hosted
   waha-send-name <name> [msg]   Cari kontak by name + kirim (WAHA)
   waha-status                   Cek session WAHA
+  waha-auto-reply [start|stop]  Auto-reply pesan masuk (webhook lokal)
   help                Tampilkan bantuan ini
 
 Contoh:
@@ -86,6 +87,9 @@ case "$cmd" in
     ;;
   waha-status)
     exec "$SCRIPT_DIR/waha-status.sh" "$@"
+    ;;
+  waha-auto-reply)
+    exec "$SCRIPT_DIR/waha-auto-reply.sh" "$@"
     ;;
   help|-h|--help)
     usage
