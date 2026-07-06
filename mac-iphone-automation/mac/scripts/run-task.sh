@@ -81,6 +81,9 @@ case "$cmd" in
   waha-send)
     exec "$SCRIPT_DIR/waha-send.sh" "$@"
     ;;
+  waha-send-name)
+    exec "$SCRIPT_DIR/waha-send-by-name.sh" "$@"
+    ;;
   waha-status)
     exec "$SCRIPT_DIR/waha-status.sh" "$@"
     ;;
