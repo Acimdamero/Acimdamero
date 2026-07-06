@@ -152,6 +152,8 @@
     "cannot_do": [
       "force_quit_arbitrary_apps",
       "read_sms_imessage_inbox_silently",
+      "read_whatsapp_inbox_or_messages",
+      "auto_send_whatsapp_without_user_tap",
       "toggle_wifi_programmatically",
       "persistent_background_daemon_without_pushcut",
       "access_other_apps_private_data",
@@ -162,7 +164,8 @@
       "remote_iphone_from_mac": "Google Sheet queue OR Pushcut webhook",
       "save_to_google_drive": "Google Drive API via Get Contents of URL OR manual upload in Drive app",
       "long_running_tasks": "Pushcut Automation Server OR split into chunks <30s",
-      "outside_home_network": "Tailscale MagicDNS for SSH to Mac"
+      "outside_home_network": "Tailscale MagicDNS for SSH to Mac",
+      "whatsapp_compose": "wa.me URL scheme → prefill draft; see iphone/WHATSAPP-GUIDE.md"
     }
   }
 }

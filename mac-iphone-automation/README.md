@@ -29,6 +29,7 @@ mac-iphone-automation/
 **Peta lengkap kontrol & integrasi iPhone:**
 
 - [`docs/IPHONE-ARCHITECTURE-MAP.md`](docs/IPHONE-ARCHITECTURE-MAP.md) — lapisan, matriks kontrol, trigger, sync topology
+- [`docs/PERMISSIONS-AND-WORKAROUNDS.md`](docs/PERMISSIONS-AND-WORKAROUNDS.md) — **cara izinkan akses & workaround otomatisasi**
 - [`iphone/command-registry.json`](iphone/command-registry.json) — registry perintah machine-readable
 - [`google/SHEET-TABS-MAP.md`](google/SHEET-TABS-MAP.md) — tab Devices, Inventory, Triggers
 
@@ -37,6 +38,8 @@ mac-iphone-automation/
 ```bash
 git clone https://github.com/Acimdamero/Acimdamero.git
 cd Acimdamero/mac-iphone-automation
+bash setup-wizard.sh    # wizard interaktif (izin + SSH + Sheet)
+# atau manual:
 bash mac/install.sh
 ```
 
