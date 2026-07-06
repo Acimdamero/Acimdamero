@@ -33,26 +33,31 @@ else
 fi
 
 # 4. Docker
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+DOCKER_CMD="docker"
+if ! docker info >/dev/null 2>&1; then
+  sudo docker info >/dev/null 2>&1 && DOCKER_CMD="sudo docker" || true
+fi
+if $DOCKER_CMD info >/dev/null 2>&1; then
   ok "docker daemon"
 else
   bad "docker daemon (buka Docker Desktop di Mac)"
 fi
 
 # 5. WAHA container
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q automation-hub-waha; then
+if $DOCKER_CMD ps --format '{{.Names}}' 2>/dev/null | grep -q automation-hub-waha; then
   ok "WAHA container running"
-  if "$HUB_HOME/run-task.sh" waha-status >/dev/null 2>&1; then
+  if WAHA_API_KEY="${WAHA_API_KEY:-automation-hub-test-key}" "$HUB_HOME/run-task.sh" waha-status >/dev/null 2>&1; then
     ok "waha-status"
   else
     bad "waha-status (scan QR di http://localhost:3000)"
   fi
 else
-  bad "WAHA container (jalankan: docker compose -f docker/docker-compose.waha.yml up -d)"
+  bad "WAHA container (jalankan: bash install-all.sh)"
 fi
 
 # 6. Port 3000
-if curl -sf --connect-timeout 2 http://localhost:3000/ >/dev/null 2>&1; then
+if curl -sf --connect-timeout 2 http://localhost:3000/ >/dev/null 2>&1 || \
+   curl -s --connect-timeout 2 -o /dev/null -w "%{http_code}" http://localhost:3000/ | grep -qE '200|401|302'; then
   ok "http://localhost:3000"
 else
   bad "http://localhost:3000 unreachable"

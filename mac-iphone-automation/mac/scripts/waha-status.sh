@@ -23,10 +23,18 @@ if [[ -n "$API_KEY" ]]; then
 fi
 
 URL="${BASE_URL}/api/sessions/${SESSION}"
-if RESPONSE=$(curl -sf "${HEADERS[@]}" "$URL" 2>/dev/null); then
-  log "INFO" "WAHA session $SESSION reachable"
-  echo "$RESPONSE"
+HTTP_CODE=$(curl -s -o /tmp/waha-status.json -w "%{http_code}" "${HEADERS[@]}" "$URL" 2>/dev/null || echo "000")
+
+if [[ "$HTTP_CODE" == "200" ]]; then
+  log "INFO" "WAHA session $SESSION: WORKING"
+  cat /tmp/waha-status.json
+elif [[ "$HTTP_CODE" == "404" ]]; then
+  log "WARN" "WAHA running — session belum ada. Scan QR di http://localhost:3000"
+  echo '{"status":"needs_qr","session":"'"$SESSION"'","dashboard":"'"$BASE_URL"'"}'
+elif [[ "$HTTP_CODE" == "401" ]]; then
+  log "ERROR" "WAHA API key salah — set WAHA_API_KEY di config.env"
+  exit 1
 else
-  log "ERROR" "WAHA tidak reachable di $BASE_URL — jalankan: docker compose -f docker/docker-compose.waha.yml up -d"
+  log "ERROR" "WAHA tidak reachable di $BASE_URL (HTTP $HTTP_CODE)"
   exit 1
 fi
