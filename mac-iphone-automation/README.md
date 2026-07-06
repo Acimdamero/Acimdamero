@@ -72,6 +72,8 @@ Ikuti [`iphone/SHORTCUTS-GUIDE.md`](iphone/SHORTCUTS-GUIDE.md):
 
 **WhatsApp (terbatas iOS):** [`iphone/WHATSAPP-GUIDE.md`](iphone/WHATSAPP-GUIDE.md) — buka chat, prefill pesan, template; **tidak bisa** baca inbox atau auto-send penuh.
 
+**WhatsApp personal GRATIS + auto kirim:** [`docs/WHATSAPP-PERSONAL-GRATIS.md`](docs/WHATSAPP-PERSONAL-GRATIS.md) — WAHA self-host, biaya Rp 0.
+
 ## Quick start (Cursor)
 
 1. Gemini API → Cursor Settings → Models → Google → Verify

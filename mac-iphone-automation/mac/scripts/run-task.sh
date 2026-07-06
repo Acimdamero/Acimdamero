@@ -77,6 +77,12 @@ case "$cmd" in
   whatsapp-send)
     exec "$SCRIPT_DIR/whatsapp-send.sh" "$@"
     ;;
+  waha-send)
+    exec "$SCRIPT_DIR/waha-send.sh" "$@"
+    ;;
+  waha-status)
+    exec "$SCRIPT_DIR/waha-status.sh" "$@"
+    ;;
   help|-h|--help)
     usage
     ;;
