@@ -12,6 +12,26 @@ echo "║  FIX — WAHA download macet / timeout                     ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
 
+wait_docker() {
+  local max="${1:-180}"
+  echo "   Menunggu Docker siap (max ${max}s)..."
+  for ((i=1; i<=max; i++)); do
+    if docker info >/dev/null 2>&1; then
+      echo ""
+      echo "   ✅ Docker siap (${i}s)"
+      return 0
+    fi
+    if (( i % 10 == 0 )); then
+      echo "   ... masih menunggu (${i}s) — pastikan Docker Desktop hijau"
+    fi
+    sleep 1
+  done
+  echo ""
+  echo "❌ Docker belum siap setelah ${max}s"
+  echo "   Buka Docker Desktop → tunggu hijau → jalankan: bash pull-waha-fast.sh"
+  exit 1
+}
+
 # 1. Stop proses bentrok
 echo "▶ [1/5] Stop LaunchAgent sementara (cegah pull ganda)..."
 launchctl unload "$PLIST" 2>/dev/null || true
@@ -22,19 +42,21 @@ docker compose -f "$REPO_DIR/docker/docker-compose.waha.fast.yml" down 2>/dev/nu
 echo "▶ [2/5] Set timeout 600 detik..."
 mkdir -p "$HUB_HOME"
 touch "$HUB_HOME/config.env"
-grep -q '^DOCKER_START_TIMEOUT=' "$HUB_HOME/config.env" 2>/dev/null \
-  && sed -i.bak 's/^DOCKER_START_TIMEOUT=.*/DOCKER_START_TIMEOUT=600/' "$HUB_HOME/config.env" \
-  || echo 'DOCKER_START_TIMEOUT=600' >> "$HUB_HOME/config.env"
+if grep -q '^DOCKER_START_TIMEOUT=' "$HUB_HOME/config.env" 2>/dev/null; then
+  sed -i.bak 's/^DOCKER_START_TIMEOUT=.*/DOCKER_START_TIMEOUT=600/' "$HUB_HOME/config.env"
+else
+  echo 'DOCKER_START_TIMEOUT=600' >> "$HUB_HOME/config.env"
+fi
 
-# 3. Restart Docker
-echo "▶ [3/5] Restart Docker Desktop..."
-osascript -e 'quit app "Docker"' 2>/dev/null || true
-sleep 3
-open -a Docker
-echo "   Menunggu Docker siap..."
-for i in $(seq 1 120); do docker info >/dev/null 2>&1 && break; sleep 2; done
-docker info >/dev/null 2>&1 || { echo "❌ Docker belum siap — buka Docker Desktop manual"; exit 1; }
-echo "   ✅ Docker siap"
+# 3. Docker — skip restart kalau sudah jalan
+echo "▶ [3/5] Cek Docker..."
+if docker info >/dev/null 2>&1; then
+  echo "   ✅ Docker sudah jalan — skip restart"
+else
+  echo "   Membuka Docker Desktop..."
+  open -a Docker
+  wait_docker 180
+fi
 
 # 4. Pull manual (progress terlihat)
 IMAGE="devlikeapro/waha:noweb-arm"
