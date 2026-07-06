@@ -30,9 +30,12 @@ function appendCommand(device, command, args, status) {
   sheet.appendRow([id, device, command, status || 'pending', args || '']);
 }
 
-/** Web App endpoint — Mac/iPhone bisa POST perintah baru */
+/** Web App endpoint — Mac/iPhone bisa POST perintah baru atau status device */
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
+  if (data.action === 'status' || (data.device && !data.command)) {
+    return handleStatus(data);
+  }
   appendCommand(data.device, data.command, data.args || '', 'pending');
   return ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -60,4 +63,24 @@ function doGet(e) {
 function markDone(row) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   sheet.getRange(Number(row), 4).setValue('done');
+}
+
+/** Log device status from iPhone/Mac POST */
+function handleStatus(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Devices');
+  if (!sheet) sheet = ss.insertSheet('Devices');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['timestamp', 'device', 'battery', 'wifi', 'hostname', 'extra']);
+  }
+  sheet.appendRow([
+    new Date().toISOString(),
+    data.device || 'unknown',
+    data.battery || '',
+    data.wifi || data.network || '',
+    data.name || data.hostname || '',
+    data.extra || data.disk || ''
+  ]);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
 }

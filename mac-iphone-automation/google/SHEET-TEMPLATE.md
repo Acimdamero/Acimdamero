@@ -52,7 +52,8 @@ Automation Hub/
 
 1. Di Spreadsheet: **Extensions → Apps Script**
 2. Paste isi `apps-script/QueueSync.gs`
-3. **Deploy → New deployment → Web app**
+3. Buat tab tambahan — lihat [`SHEET-TABS-MAP.md`](SHEET-TABS-MAP.md) (`Devices`, `Inventory`, `Triggers`)
+4. **Deploy → New deployment → Web app**
 4. Execute as: **Me** | Who has access: **Anyone** (atau hanya Anda)
 5. Salin **Web App URL** → masukkan ke Shortcuts iPhone
 

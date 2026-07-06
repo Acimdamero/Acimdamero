@@ -17,12 +17,20 @@ Pusat otomatisasi untuk **Mac**, **iPhone**, **Google (Drive/Sheets)**, dan **Cu
 ```
 mac-iphone-automation/
 ├── mac/              # Script Mac + installer + daemon
-├── iphone/           # Panduan Shortcuts
-├── google/           # Template Sheet + Apps Script
+├── iphone/           # Panduan Shortcuts + command registry
+├── google/           # Template Sheet + Apps Script + tab mapping
 ├── cursor/           # Contoh MCP config
 ├── config/           # Contoh environment
-└── docs/             # Setup akun & keamanan
+└── docs/             # Arsitektur iPhone + akun & keamanan
 ```
+
+## Dokumentasi arsitektur iPhone
+
+**Peta lengkap kontrol & integrasi iPhone:**
+
+- [`docs/IPHONE-ARCHITECTURE-MAP.md`](docs/IPHONE-ARCHITECTURE-MAP.md) — lapisan, matriks kontrol, trigger, sync topology
+- [`iphone/command-registry.json`](iphone/command-registry.json) — registry perintah machine-readable
+- [`google/SHEET-TABS-MAP.md`](google/SHEET-TABS-MAP.md) — tab Devices, Inventory, Triggers
 
 ## Quick start (Mac)
 
