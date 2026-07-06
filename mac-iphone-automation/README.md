@@ -66,6 +66,8 @@ Ikuti [`iphone/SHORTCUTS-GUIDE.md`](iphone/SHORTCUTS-GUIDE.md):
 - SSH ke Mac (Status, Backup, Sleep, App control)
 - Polling antrian iPhone dari Google Sheet
 
+**WhatsApp (terbatas iOS):** [`iphone/WHATSAPP-GUIDE.md`](iphone/WHATSAPP-GUIDE.md) — buka chat, prefill pesan, template; **tidak bisa** baca inbox atau auto-send penuh.
+
 ## Quick start (Cursor)
 
 1. Gemini API → Cursor Settings → Models → Google → Verify
