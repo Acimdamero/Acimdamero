@@ -1,92 +1,90 @@
 #!/bin/bash
-# Instalasi lengkap Automation Hub — jalankan di Mac.
-# Usage: bash install-all.sh
-
+# Instalasi lengkap — non-interactive, Mac atau Linux.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HUB_HOME="${AUTOMATION_HUB_HOME:-$HOME/.automation-hub}"
-
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "⚠️  Script ini untuk macOS. Jalankan di MacBook Anda."
-  exit 1
-fi
+OS="$(uname -s)"
 
 echo "╔══════════════════════════════════════════════╗"
-echo "║   Automation Hub — Full Install (Mac)        ║"
+echo "║   Automation Hub — Full Install              ║"
 echo "╚══════════════════════════════════════════════╝"
-echo ""
 
 # 1. Hub agent
-echo "==> [1/5] Install Hub agent..."
+echo "==> [1/6] Hub agent..."
 bash "$REPO_DIR/mac/install.sh"
 
-# 2. SSH key for iPhone
-echo ""
-echo "==> [2/5] SSH key untuk iPhone..."
+# 2. Config defaults
+echo "==> [2/6] Config..."
+grep -q '^WAHA_API_KEY=' "$HUB_HOME/config.env" 2>/dev/null || echo 'WAHA_API_KEY=automation-hub-test-key' >> "$HUB_HOME/config.env"
+sed -i.bak 's|^# WAHA_API_KEY=.*|WAHA_API_KEY=automation-hub-test-key|' "$HUB_HOME/config.env" 2>/dev/null || true
+sed -i.bak 's|^WHATSAPP_BACKEND=.*|WHATSAPP_BACKEND=waha|' "$HUB_HOME/config.env" 2>/dev/null || true
+
+# 3. SSH key
+echo "==> [3/6] SSH key..."
 KEY="$HOME/.ssh/automation_hub"
 if [[ ! -f "$KEY" ]]; then
-  ssh-keygen -t ed25519 -f "$KEY" -N "" -C "automation-hub"
-  mkdir -p "$HOME/.ssh"
-  chmod 700 "$HOME/.ssh"
-  touch "$HOME/.ssh/authorized_keys"
-  chmod 600 "$HOME/.ssh/authorized_keys"
-  grep -qF "$(cat "${KEY}.pub")" "$HOME/.ssh/authorized_keys" 2>/dev/null \
-    || cat "${KEY}.pub" >> "$HOME/.ssh/authorized_keys"
-  echo "✅ SSH key dibuat"
+  mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+  ssh-keygen -t ed25519 -f "$KEY" -N "" -C "automation-hub" -q
+  touch "$HOME/.ssh/authorized_keys" && chmod 600 "$HOME/.ssh/authorized_keys"
+  grep -qF "$(cat "${KEY}.pub")" "$HOME/.ssh/authorized_keys" 2>/dev/null || cat "${KEY}.pub" >> "$HOME/.ssh/authorized_keys"
+  echo "✅ SSH key: $KEY"
 fi
-echo ""
-echo "📋 Public key — paste ke iPhone Shortcuts (SSH Key):"
-echo "────────────────────────────────────────"
-cat "${KEY}.pub"
-echo "────────────────────────────────────────"
 
-# 3. Remote Login reminder
-echo ""
-echo "==> [3/5] Remote Login..."
-if systemsetup -getremotelogin 2>/dev/null | grep -q "On"; then
-  echo "✅ Remote Login ON"
+# 4. Remote Login (macOS only)
+if [[ "$OS" == "Darwin" ]]; then
+  echo "==> [4/6] Remote Login..."
+  systemsetup -getremotelogin 2>/dev/null | grep -q On && echo "✅ Remote Login ON" || echo "⚠️  Enable Remote Login in System Settings"
 else
-  echo "⚠️  Nyalakan: System Settings → General → Sharing → Remote Login"
+  echo "==> [4/6] Remote Login skipped (not macOS)"
 fi
-HOSTNAME=$(scutil --get LocalHostName 2>/dev/null || hostname)
-echo "   Hostname iPhone SSH: ${HOSTNAME}.local"
 
-# 4. Docker + WAHA
-echo ""
-echo "==> [4/5] Docker + WAHA..."
-if ! command -v docker >/dev/null 2>&1; then
-  echo "⚠️  Docker belum terinstall. Install Docker Desktop:"
-  echo "   https://www.docker.com/products/docker-desktop/"
-else
-  if docker info >/dev/null 2>&1; then
-    docker compose -f "$REPO_DIR/docker/docker-compose.waha.yml" up -d
-    echo "✅ WAHA starting → http://localhost:3000"
-    echo "   Scan QR: WhatsApp → Linked Devices → Link a Device"
-  else
-    echo "⚠️  Buka Docker Desktop dulu, lalu jalankan:"
-    echo "   docker compose -f $REPO_DIR/docker/docker-compose.waha.yml up -d"
+# 5. Docker + WAHA
+echo "==> [5/6] Docker + WAHA..."
+DOCKER_CMD="docker"
+if ! docker info >/dev/null 2>&1; then
+  if sudo docker info >/dev/null 2>&1; then
+    DOCKER_CMD="sudo docker"
+  elif [[ "$OS" != "Darwin" ]]; then
+    if ! command -v docker >/dev/null; then
+      sudo apt-get update -qq && sudo apt-get install -y -qq docker.io docker-compose-v2 2>/dev/null || true
+    fi
+    if ! pgrep -x dockerd >/dev/null 2>&1; then
+      sudo dockerd >/tmp/dockerd-hub.log 2>&1 &
+      sleep 4
+    fi
+    docker info >/dev/null 2>&1 || DOCKER_CMD="sudo docker"
   fi
 fi
 
-# 5. Test
-echo ""
-echo "==> [5/5] Test Hub..."
-"$HUB_HOME/run-task.sh" status || true
+if $DOCKER_CMD info >/dev/null 2>&1; then
+  export WAHA_API_KEY="${WAHA_API_KEY:-automation-hub-test-key}"
+  $DOCKER_CMD compose -f "$REPO_DIR/docker/docker-compose.waha.yml" up -d 2>&1 || \
+    $DOCKER_CMD compose -f "$REPO_DIR/docker/docker-compose.waha.yml" pull 2>&1 && \
+    $DOCKER_CMD compose -f "$REPO_DIR/docker/docker-compose.waha.yml" up -d 2>&1 || true
+
+  sleep 5
+  if $DOCKER_CMD ps --format '{{.Names}}' 2>/dev/null | grep -q automation-hub-waha; then
+    echo "✅ WAHA container running → http://localhost:3000"
+  else
+    echo "⚠️  WAHA container not running — open Docker Desktop on Mac and retry"
+  fi
+else
+  echo "⚠️  Docker not available — install Docker Desktop on Mac"
+fi
+
+# 6. Test
+echo "==> [6/6] Tests..."
+"$HUB_HOME/run-task.sh" status 2>&1 | tail -3 || true
+bash "$REPO_DIR/verify-install.sh" 2>&1 || true
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
-echo "║   ✅ Instalasi Mac selesai                    ║"
+echo "║   Install selesai                             ║"
 echo "╠══════════════════════════════════════════════╣"
-echo "║ iPhone — buka Shortcuts, buat:               ║"
-echo "║  • Hub — Status Mac (SSH)                    ║"
-echo "║  • Hub — Execute Command                     ║"
-echo "║  • Hub — WhatsApp Test (Open URL wa.me)      ║"
-echo "║                                              ║"
-echo "║ Test WA (Mac harus WAHA + QR scan):          ║"
-echo "║  ~/.automation-hub/run-task.sh waha-status  ║"
+echo "║ Mac: scan QR → http://localhost:3000         ║"
+echo "║ iPhone: iphone/INSTALL-IPHONE.md             ║"
+echo "║ Test WA:                                     ║"
 echo "║  ~/.automation-hub/run-task.sh waha-send-name\\"
-echo "║    \"agwen acim damero jerman\" \"Test Hub\"     ║"
-echo "║                                              ║"
-echo "║ Panduan: iphone/INSTALL-IPHONE.md            ║"
+echo "║    \"agwen acim damero jerman\" \"Test Hub\"       ║"
 echo "╚══════════════════════════════════════════════╝"
