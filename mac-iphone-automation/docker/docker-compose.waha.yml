@@ -6,8 +6,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      WHATSAPP_DEFAULT_ENGINE: NOWEB
-      WAHA_API_KEY: ${WAHA_API_KEY:-change-me-in-production}
+      WHATSAPP_DEFAULT_ENGINE: WEBJS
+      WAHA_API_KEY: ${WAHA_API_KEY:-automation-hub-test-key}
       WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
       WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:-change-me}
       # Webhook ke Apps Script atau Mac relay — isi setelah deploy
