@@ -1,0 +1,64 @@
+{
+  "name": "Hub — Post iPhone Status",
+  "description": "Kirim status iPhone ke Automation Hub via Google Apps Script webhook",
+  "version": "1.0",
+  "setup": {
+    "webhook_url": "PASTE_APPS_SCRIPT_WEB_APP_URL_HERE",
+    "method": "POST",
+    "content_type": "application/json"
+  },
+  "actions_sequence": [
+    {
+      "step": 1,
+      "action": "Get Battery Level",
+      "output": "BatteryLevel"
+    },
+    {
+      "step": 2,
+      "action": "Get Current IP Address",
+      "output": "IPAddress",
+      "note": "Optional — may require network access"
+    },
+    {
+      "step": 3,
+      "action": "Get Device Details",
+      "output": "DeviceDetails"
+    },
+    {
+      "step": 4,
+      "action": "Get Network Details",
+      "output": "NetworkDetails"
+    },
+    {
+      "step": 5,
+      "action": "Dictionary",
+      "keys": {
+        "device": "iphone",
+        "battery": "BatteryLevel",
+        "ip": "IPAddress",
+        "name": "DeviceDetails.Name",
+        "wifi": "NetworkDetails.Wi-Fi",
+        "timestamp": "ISO8601 from Current Date"
+      }
+    },
+    {
+      "step": 6,
+      "action": "Get Contents of URL",
+      "url": "{{webhook_url}}?action=status",
+      "method": "POST",
+      "request_body": "JSON Dictionary from step 5"
+    },
+    {
+      "step": 7,
+      "action": "Show Notification",
+      "title": "Hub Status Posted",
+      "optional": true
+    }
+  ],
+  "automation_triggers": [
+    "Wi-Fi: home network → Run Immediately",
+    "Time of Day: every 6 hours → Run Immediately",
+    "Charger: connected → Run Immediately"
+  ],
+  "apps_script_handler_addition": "function handleStatus(data) { const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Devices') || SpreadsheetApp.getActiveSpreadsheet().insertSheet('Devices'); sheet.appendRow([new Date(), data.device, data.battery, data.wifi, data.name, data.timestamp]); }"
+}

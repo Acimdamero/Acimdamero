@@ -1,0 +1,171 @@
+{
+  "$schema": "automation-hub/iphone-command-registry/v1",
+  "description": "Registry perintah iPhone untuk Google Sheet Queue — kolom device=iphone",
+  "commands": [
+    {
+      "command": "notify",
+      "args_format": "message text",
+      "shortcut_action": "Show Notification",
+      "requires_unlock": false,
+      "hub_priority": "high"
+    },
+    {
+      "command": "open-url",
+      "args_format": "https://...",
+      "shortcut_action": "Open URL",
+      "requires_unlock": false,
+      "hub_priority": "high"
+    },
+    {
+      "command": "focus-on",
+      "args_format": "Work|Personal|Sleep|Do Not Disturb",
+      "shortcut_action": "Set Focus",
+      "requires_unlock": false,
+      "hub_priority": "medium"
+    },
+    {
+      "command": "focus-off",
+      "args_format": "",
+      "shortcut_action": "Turn Focus Off",
+      "requires_unlock": false,
+      "hub_priority": "medium"
+    },
+    {
+      "command": "run-shortcut",
+      "args_format": "Shortcut Name",
+      "shortcut_action": "Run Shortcut",
+      "requires_unlock": false,
+      "hub_priority": "high"
+    },
+    {
+      "command": "post-status",
+      "args_format": "",
+      "shortcut_action": "Get Battery Level + Get Network Details → POST webhook",
+      "requires_unlock": false,
+      "hub_priority": "high"
+    },
+    {
+      "command": "homekit-scene",
+      "args_format": "Scene Name",
+      "shortcut_action": "Run Home Scene",
+      "requires_unlock": false,
+      "hub_priority": "medium"
+    },
+    {
+      "command": "reminder-add",
+      "args_format": "title",
+      "shortcut_action": "Add New Reminder",
+      "requires_unlock": false,
+      "hub_priority": "low"
+    },
+    {
+      "command": "calendar-add",
+      "args_format": "title|ISO8601 datetime",
+      "shortcut_action": "Add New Event",
+      "requires_unlock": false,
+      "hub_priority": "low"
+    },
+    {
+      "command": "ssh-mac",
+      "args_format": "subcommand [args...]",
+      "shortcut_action": "Run Script Over SSH → ~/.automation-hub/run-task.sh",
+      "requires_unlock": true,
+      "hub_priority": "critical"
+    },
+    {
+      "command": "backup-request",
+      "args_format": "all|documents|desktop",
+      "shortcut_action": "ssh-mac backup {args}",
+      "requires_unlock": true,
+      "hub_priority": "critical"
+    },
+    {
+      "command": "whatsapp-open",
+      "args_format": "",
+      "shortcut_action": "Open URL → whatsapp://",
+      "requires_unlock": true,
+      "hub_priority": "medium",
+      "notes": "Buka app WhatsApp saja"
+    },
+    {
+      "command": "whatsapp-chat",
+      "args_format": "628xxx|message text",
+      "shortcut_action": "Encode text → Open URL wa.me/{phone}?text={msg}",
+      "requires_unlock": true,
+      "hub_priority": "high",
+      "notes": "Buka chat + prefill pesan; user tap Send manual"
+    },
+    {
+      "command": "whatsapp-template",
+      "args_format": "template_key|628xxx",
+      "shortcut_action": "Lookup template → whatsapp-chat",
+      "requires_unlock": true,
+      "hub_priority": "medium",
+      "notes": "Template: on-my-way, running-late, available"
+    }
+  ],
+  "triggers_recommended": [
+    {
+      "trigger": "Time of Day",
+      "schedule": "every 15 minutes",
+      "shortcut": "Hub — Process iPhone Queue",
+      "run_immediately": true,
+      "note": "Polling antrian Sheet"
+    },
+    {
+      "trigger": "Wi-Fi",
+      "network": "home-network-ssid",
+      "shortcut": "Hub — Post iPhone Status",
+      "run_immediately": true
+    },
+    {
+      "trigger": "Charger",
+      "event": "connected",
+      "shortcut": "Hub — Night Sync",
+      "run_immediately": true,
+      "note": "Append mac/backup/all/pending ke Sheet"
+    },
+    {
+      "trigger": "Focus",
+      "mode": "Work",
+      "event": "turning_on",
+      "shortcut": "Hub — ssh-mac status",
+      "run_immediately": true
+    },
+    {
+      "trigger": "NFC",
+      "tag": "hub-trigger",
+      "shortcut": "Hub — Execute Command",
+      "run_immediately": true
+    }
+  ],
+  "data_sync_map": [
+    { "data": "documents", "iphone": "Files / Drive app", "sync": "Google Drive", "mac": "rsync backup.sh" },
+    { "data": "photos", "iphone": "Photos", "sync": "iCloud Photos", "mac": "Photos.app" },
+    { "data": "contacts", "iphone": "Contacts", "sync": "Google Contacts", "mac": "Contacts.app" },
+    { "data": "calendar", "iphone": "Calendar", "sync": "Google Calendar", "mac": "Calendar.app" },
+    { "data": "command_queue", "iphone": "Shortcuts poll", "sync": "Google Sheet", "mac": "queue-processor.sh" },
+    { "data": "device_logs", "iphone": "POST webhook", "sync": "Google Drive Logs/", "mac": "status.sh" },
+    { "data": "passwords", "iphone": "Keychain / 1Password", "sync": "none-to-sheet", "mac": "op CLI / security" }
+  ],
+  "control_limits": {
+    "cannot_do": [
+      "force_quit_arbitrary_apps",
+      "read_sms_imessage_inbox_silently",
+      "read_whatsapp_inbox_or_messages",
+      "auto_send_whatsapp_without_user_tap",
+      "toggle_wifi_programmatically",
+      "persistent_background_daemon_without_pushcut",
+      "access_other_apps_private_data",
+      "automate_apple_pay",
+      "force_icloud_sync"
+    ],
+    "workarounds": {
+      "remote_iphone_from_mac": "Google Sheet queue OR Pushcut webhook",
+      "save_to_google_drive": "Google Drive API via Get Contents of URL OR manual upload in Drive app",
+      "long_running_tasks": "Pushcut Automation Server OR split into chunks <30s",
+      "outside_home_network": "Tailscale MagicDNS for SSH to Mac",
+      "whatsapp_compose": "wa.me URL scheme → prefill draft; see iphone/WHATSAPP-GUIDE.md"
+    }
+  }
+}
