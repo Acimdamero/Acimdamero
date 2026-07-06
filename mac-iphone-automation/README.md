@@ -28,6 +28,7 @@ mac-iphone-automation/
 
 **Peta lengkap kontrol & integrasi iPhone:**
 
+- [`docs/EDTIME-BERICHTSHEFT-ARCHITECTURE.md`](docs/EDTIME-BERICHTSHEFT-ARCHITECTURE.md) — **skema jembatan edtime (iPhone) ↔ Berichtsheft**, batasan, pro/kontra
 - [`docs/IPHONE-ARCHITECTURE-MAP.md`](docs/IPHONE-ARCHITECTURE-MAP.md) — lapisan, matriks kontrol, trigger, sync topology
 - [`docs/PERMISSIONS-AND-WORKAROUNDS.md`](docs/PERMISSIONS-AND-WORKAROUNDS.md) — **cara izinkan akses & workaround otomatisasi**
 - [`docs/WAHA-API-GUIDE.md`](docs/WAHA-API-GUIDE.md) — **WAHA self-hosted API (akali WA personal)**
