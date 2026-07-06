@@ -93,3 +93,15 @@ function handleStatus(data) {
   return ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+function logWaSent(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Outbox');
+  if (!sheet) sheet = ss.insertSheet('Outbox');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['timestamp', 'to', 'message', 'status']);
+  }
+  sheet.appendRow([new Date().toISOString(), data.to || '', data.message || '', 'sent']);
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
