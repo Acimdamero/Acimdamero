@@ -24,7 +24,8 @@ if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -z "${WAHA_COMPOS
   [[ -f "$FAST" ]] && COMPOSE_FILE="$FAST"
 fi
 API_KEY="${WAHA_API_KEY:-automation-hub-test-key}"
-MAX_WAIT="${DOCKER_START_TIMEOUT:-120}"
+MAX_WAIT="${DOCKER_START_TIMEOUT:-300}"
+LOCK_DIR="$HUB_HOME/logs/docker-autostart.lockdir"
 
 # Skip jika dimatikan
 [[ "${DOCKER_AUTOSTART:-1}" == "0" ]] && { log "DOCKER_AUTOSTART=0, skip"; exit 0; }
@@ -100,6 +101,14 @@ start_waha() {
 }
 
 log "=== Docker autostart begin ==="
+
+# Cegah 2 proses pull bersamaan (whatsapp-setup + LaunchAgent)
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  log "Proses lain sedang jalan — skip (normal)"
+  exit 0
+fi
+
 start_docker_desktop
 start_waha
 log "=== Docker autostart done ==="
