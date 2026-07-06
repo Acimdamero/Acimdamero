@@ -1,0 +1,23 @@
+# WAHA ringan — tanpa Chromium, download ~30% lebih cepat di Mac M1/M2.
+# Engine NOWEB: kirim/terima WA tetap jalan, QR scan tetap bisa.
+services:
+  waha:
+    image: ${WAHA_IMAGE:-devlikeapro/waha:noweb-arm}
+    container_name: automation-hub-waha
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_API_KEY: ${WAHA_API_KEY:-automation-hub-test-key}
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:-change-me}
+      WAHA_WEBHOOK_EVENTS: message,message.any,session.status
+      WAHA_PRINT_QR: "true"
+    volumes:
+      - waha-sessions:/app/.sessions
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  waha-sessions:

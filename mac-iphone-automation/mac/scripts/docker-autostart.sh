@@ -18,6 +18,11 @@ log() {
 
 REPO_DIR="${AUTOMATION_REPO:-$HOME/Acimdamero/mac-iphone-automation}"
 COMPOSE_FILE="${WAHA_COMPOSE_FILE:-$REPO_DIR/docker/docker-compose.waha.yml}"
+# Mac Apple Silicon: pakai image ringan (noweb-arm) secara default
+if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" && -z "${WAHA_COMPOSE_FILE:-}" ]]; then
+  FAST="$REPO_DIR/docker/docker-compose.waha.fast.yml"
+  [[ -f "$FAST" ]] && COMPOSE_FILE="$FAST"
+fi
 API_KEY="${WAHA_API_KEY:-automation-hub-test-key}"
 MAX_WAIT="${DOCKER_START_TIMEOUT:-120}"
 

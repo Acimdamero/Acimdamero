@@ -65,7 +65,7 @@ api -X POST "$BASE_URL/api/sessions/stop" \
 sleep 2
 api -X POST "$BASE_URL/api/sessions/start" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"$SESSION\",\"config\":{\"engine\":\"WEBJS\"}}" >/dev/null 2>&1 || true
+  -d "{\"name\":\"$SESSION\",\"config\":{\"engine\":\"NOWEB\"}}" >/dev/null 2>&1 || true
 sleep 5
 
 STATUS=$(session_status)

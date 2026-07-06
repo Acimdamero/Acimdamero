@@ -21,7 +21,7 @@ echo ""
 }
 
 # ── 1. Clone repo jika belum ada ───────────────────────────────
-echo "▶ [1/3] Cek repository..."
+echo "▶ [1/4] Cek repository..."
 if [[ ! -f "$HUB_DIR/pair-whatsapp.sh" ]]; then
   echo "   Repo belum ada — clone ke $TARGET"
   mkdir -p "$(dirname "$TARGET")"
@@ -41,12 +41,16 @@ fi
 
 cd "$HUB_DIR"
 
-# ── 2. Install hub agent ───────────────────────────────────────
-echo "▶ [2/3] Install hub agent..."
+# ── 2. Download WAHA cepat (image ringan) ──────────────────────
+echo "▶ [2/4] Download WAHA (versi ringan, lebih cepat)..."
+bash "$HUB_DIR/pull-waha-fast.sh"
+
+# ── 3. Install hub agent ───────────────────────────────────────
+echo "▶ [3/4] Install hub agent..."
 bash "$HUB_DIR/mac/install.sh"
 
-# ── 3. Pair WhatsApp + test kirim ──────────────────────────────
-echo "▶ [3/3] Pair WhatsApp..."
+# ── 4. Pair WhatsApp + test kirim ──────────────────────────────
+echo "▶ [4/4] Pair WhatsApp..."
 bash "$HUB_DIR/pair-whatsapp.sh" \
   "agwen acim damero jerman" \
   "🤖 Test Automation Hub — WhatsApp otomatis dari Mac ✅"
