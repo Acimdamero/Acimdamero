@@ -83,6 +83,25 @@ fi
 
 # --- Step 6: Test ---
 echo ""
+read -r -p "Simpan Pushcut Server Secret ke Keychain? [y/N] " SAVE_PUSH
+if [[ "$SAVE_PUSH" =~ ^[Yy]$ ]]; then
+  read -r -p "Paste Pushcut secret: " PUSH_SECRET
+  security add-generic-password -s automation-hub -a pushcut-secret -w "$PUSH_SECRET" -U 2>/dev/null \
+    && echo "✅ pushcut-secret disimpan" || echo "⚠️  Gagal simpan"
+fi
+
+echo ""
+read -r -p "Setup WhatsApp Business API token? [y/N] " SAVE_WA
+if [[ "$SAVE_WA" =~ ^[Yy]$ ]]; then
+  read -r -p "WhatsApp Access Token: " WA_TOKEN
+  read -r -p "Phone Number ID: " WA_PHONE
+  security add-generic-password -s automation-hub -a wa-token -w "$WA_TOKEN" -U 2>/dev/null || true
+  security add-generic-password -s automation-hub -a wa-phone-id -w "$WA_PHONE" -U 2>/dev/null || true
+  echo "✅ WhatsApp API credentials disimpan di Keychain"
+  echo "   Test: $HUB_HOME/run-task.sh whatsapp-send 628YOURNUMBER 'Test Hub'"
+fi
+
+echo ""
 read -r -p "Jalankan test status sekarang? [Y/n] " TEST
 TEST=${TEST:-Y}
 if [[ "$TEST" =~ ^[Yy]$ ]]; then

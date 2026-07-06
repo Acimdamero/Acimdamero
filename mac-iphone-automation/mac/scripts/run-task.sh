@@ -26,6 +26,9 @@ Commands:
   cursor-pull <dir>   Git pull di project Cursor
   cursor-build <dir>  npm run build (jika ada package.json)
   queue-process       Proses antrian dari Google Sheet
+  pushcut <shortcut> [input]  Trigger iPhone via Pushcut (instant)
+  iphone-dispatch <cmd> [args]  Kirim perintah ke iPhone (Pushcut/Sheet)
+  whatsapp-send <phone> <msg>   Kirim WA full-auto (Business API)
   help                Tampilkan bantuan ini
 
 Contoh:
@@ -62,6 +65,15 @@ case "$cmd" in
     ;;
   queue-process)
     exec "$SCRIPT_DIR/queue-processor.sh" "$@"
+    ;;
+  pushcut)
+    exec "$SCRIPT_DIR/pushcut-trigger.sh" "$@"
+    ;;
+  iphone-dispatch)
+    exec "$SCRIPT_DIR/iphone-dispatch.sh" "$@"
+    ;;
+  whatsapp-send)
+    exec "$SCRIPT_DIR/whatsapp-send.sh" "$@"
     ;;
   help|-h|--help)
     usage

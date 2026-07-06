@@ -30,6 +30,7 @@ mac-iphone-automation/
 
 - [`docs/IPHONE-ARCHITECTURE-MAP.md`](docs/IPHONE-ARCHITECTURE-MAP.md) — lapisan, matriks kontrol, trigger, sync topology
 - [`docs/PERMISSIONS-AND-WORKAROUNDS.md`](docs/PERMISSIONS-AND-WORKAROUNDS.md) — **cara izinkan akses & workaround otomatisasi**
+- [`docs/MAX-AUTOMATION-STACK.md`](docs/MAX-AUTOMATION-STACK.md) — **solusi lengkap atasi semua batasan (Pushcut + WA Business API)**
 - [`iphone/command-registry.json`](iphone/command-registry.json) — registry perintah machine-readable
 - [`google/SHEET-TABS-MAP.md`](google/SHEET-TABS-MAP.md) — tab Devices, Inventory, Triggers
 

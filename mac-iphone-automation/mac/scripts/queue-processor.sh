@@ -52,8 +52,15 @@ for idx, row in enumerate(rows, start=2):
     if not str(command).strip():
         continue
     cmd = [run_task, str(command).strip()]
-    if str(args).strip():
-        cmd.extend(str(args).split())
+    args_str = str(args).strip()
+    if args_str:
+        # Pipe-separated args (e.g. whatsapp-send 628xxx|message)
+        if "|" in args_str and str(command).strip() in (
+            "whatsapp-send", "iphone-dispatch", "pushcut"
+        ):
+            cmd.extend(args_str.split("|", 1))
+        else:
+            cmd.extend(args_str.split())
     print(f"EXEC row={idx} {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True, timeout=600)

@@ -1,0 +1,90 @@
+{
+  "name": "Hub — Execute Command",
+  "description": "Router pusat semua perintah iPhone dari Pushcut/Sheet. Input format: command|args",
+  "version": "2.0",
+  "input_format": "command|arg1|arg2...",
+  "handlers": [
+    {
+      "command": "notify",
+      "args": ["message"],
+      "actions": ["Show Notification with message"]
+    },
+    {
+      "command": "open-url",
+      "args": ["url"],
+      "actions": ["Open URL"]
+    },
+    {
+      "command": "focus-on",
+      "args": ["mode"],
+      "actions": ["Set Focus to mode"]
+    },
+    {
+      "command": "focus-off",
+      "actions": ["Turn Focus Off"]
+    },
+    {
+      "command": "whatsapp-open",
+      "actions": ["Open URL whatsapp://"]
+    },
+    {
+      "command": "whatsapp-chat",
+      "args": ["phone", "message"],
+      "actions": [
+        "Encode Text message URL",
+        "Text https://wa.me/{phone}?text={encoded}",
+        "Open URL"
+      ],
+      "note": "Draft only — 1 tap Send. For full auto use Mac whatsapp-send"
+    },
+    {
+      "command": "whatsapp-template",
+      "args": ["template_key", "phone"],
+      "templates": {
+        "on-my-way": "Otw, sekitar 15 menit lagi",
+        "running-late": "Maaf telat, masih di jalan",
+        "available": "Sudah available, bisa call",
+        "backup-done": "Backup selesai ✅"
+      },
+      "actions": ["Lookup template → whatsapp-chat"]
+    },
+    {
+      "command": "ssh-mac",
+      "args": ["subcommand", "extra_args"],
+      "actions": ["Run Script Over SSH: ~/.automation-hub/run-task.sh {subcommand} {extra_args}"]
+    },
+    {
+      "command": "backup-request",
+      "args": ["target"],
+      "actions": ["ssh-mac backup {target}"]
+    },
+    {
+      "command": "post-status",
+      "actions": ["Run Shortcut Hub — Post iPhone Status"]
+    },
+    {
+      "command": "homekit-scene",
+      "args": ["scene_name"],
+      "actions": ["Run Home Scene"]
+    },
+    {
+      "command": "run-shortcut",
+      "args": ["shortcut_name"],
+      "actions": ["Run Shortcut"]
+    }
+  ],
+  "pushcut_setup": {
+    "server_shortcut": "Hub — Execute Command",
+    "receive_input": "Shortcut Input from Pushcut",
+    "parse": "Split Shortcut Input by | → command + args",
+    "timeout": "nowait"
+  },
+  "shortcut_build_steps": [
+    "1. Receive Shortcut Input (from Pushcut or Run Shortcut)",
+    "2. Split Text by | → command at [0], rest = args",
+    "3. If command = notify → Show Notification (args joined)",
+    "4. If command = whatsapp-chat → Build wa.me URL → Open URL",
+    "5. If command = ssh-mac → Run Script Over SSH with run-task.sh",
+    "6. Else → Show Notification Unknown command"
+  ]
+}

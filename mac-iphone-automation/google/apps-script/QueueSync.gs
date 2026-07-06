@@ -30,19 +30,28 @@ function appendCommand(device, command, args, status) {
   sheet.appendRow([id, device, command, status || 'pending', args || '']);
 }
 
-/** Web App endpoint — Mac/iPhone bisa POST perintah baru atau status device */
+/** Web App endpoint — Mac/iPhone POST, WhatsApp inbound, status */
 function doPost(e) {
+  const waResult = processWhatsAppPost(e);
+  if (waResult) return waResult;
+
   const data = JSON.parse(e.postData.contents);
   if (data.action === 'status' || (data.device && !data.command)) {
     return handleStatus(data);
+  }
+  if (data.action === 'wa_sent') {
+    return logWaSent(data);
   }
   appendCommand(data.device, data.command, data.args || '', 'pending');
   return ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/** iPhone Shortcuts polling — GET pending commands for device */
+/** iPhone Shortcuts polling — GET pending commands OR WhatsApp verify */
 function doGet(e) {
+  const waVerify = doGetWhatsApp(e);
+  if (waVerify) return waVerify;
+
   const device = (e.parameter.device || 'iphone').toLowerCase();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   const rows = sheet.getDataRange().getValues();
