@@ -26,7 +26,14 @@ URL="${BASE_URL}/api/sessions/${SESSION}"
 HTTP_CODE=$(curl -s -o /tmp/waha-status.json -w "%{http_code}" "${HEADERS[@]}" "$URL" 2>/dev/null || echo "000")
 
 if [[ "$HTTP_CODE" == "200" ]]; then
-  log "INFO" "WAHA session $SESSION: WORKING"
+  SESSION_STATUS=$(python3 -c "import json; print(json.load(open('/tmp/waha-status.json')).get('status','UNKNOWN'))" 2>/dev/null || echo "UNKNOWN")
+  if [[ "$SESSION_STATUS" == "WORKING" ]]; then
+    log "INFO" "WAHA session $SESSION: WORKING ✅"
+  elif [[ "$SESSION_STATUS" == "SCAN_QR_CODE" || "$SESSION_STATUS" == "STARTING" ]]; then
+    log "WARN" "WAHA session $SESSION: $SESSION_STATUS — scan QR di ${BASE_URL}/dashboard"
+  else
+    log "INFO" "WAHA session $SESSION: $SESSION_STATUS"
+  fi
   cat /tmp/waha-status.json
 elif [[ "$HTTP_CODE" == "404" ]]; then
   log "WARN" "WAHA running — session belum ada. Scan QR di http://localhost:3000"

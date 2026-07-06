@@ -52,23 +52,11 @@ docker ps | grep -q automation-hub-waha || { echo "❌ WAHA container gagal"; ex
 echo "   ✅ WAHA container running"
 
 # ── 5. Start WhatsApp session ────────────────────────────────
-echo "▶ [5/8] Start session WhatsApp..."
-curl -sf -X POST "http://127.0.0.1:3000/api/sessions/start" \
-  -H "X-Api-Key: $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"default"}' 2>/dev/null || true
-sleep 5
-
-STATUS=$(curl -sf "http://127.0.0.1:3000/api/sessions/default" \
-  -H "X-Api-Key: $API_KEY" 2>/dev/null || echo '{}')
-echo "   Session: $STATUS"
-
-if echo "$STATUS" | grep -q '"status":"WORKING"'; then
-  echo "   ✅ WhatsApp sudah terhubung"
+echo "▶ [5/8] Pair WhatsApp (WAHA)..."
+if bash "$REPO_DIR/pair-whatsapp.sh" "agwen acim damero jerman" \
+  "🤖 Test Automation Hub — semua sistem jalan otomatis ✅" 2>/dev/null; then
   WA_CONNECTED=1
 else
-  echo "   ⚠️  Perlu scan QR — membuka dashboard..."
-  open "http://localhost:3000/dashboard" 2>/dev/null || true
   WA_CONNECTED=0
 fi
 
@@ -90,23 +78,11 @@ bash "$REPO_DIR/verify-install.sh" || true
 # ── 8. Test kirim WA (jika terhubung) ─────────────────────────
 echo "▶ [8/8] Test kirim WhatsApp..."
 if [[ "${WA_CONNECTED:-0}" == "1" ]]; then
-  "$HUB_HOME/run-task.sh" waha-send-name "agwen acim damero jerman" \
-    "🤖 Test Automation Hub — semua sistem jalan otomatis ✅" 2>&1 && \
-    echo "   ✅ Pesan test terkirim!" || \
-    echo "   ⚠️  Kirim gagal — cek kontak name/nomor"
+  echo "   ✅ Pesan test sudah dikirim via pair-whatsapp.sh"
 else
   echo ""
-  echo "   ┌─────────────────────────────────────────────────┐"
-  echo "   │  SCAN QR SEKARANG (hanya sekali):               │"
-  echo "   │                                                 │"
-  echo "   │  1. Browser: http://localhost:3000/dashboard    │"
-  echo "   │  2. Login: admin / change-me                    │"
-  echo "   │  3. Sessions → default → QR                     │"
-  echo "   │  4. iPhone: WhatsApp → Linked Devices → Scan   │"
-  echo "   │                                                 │"
-  echo "   │  Setelah scan, jalankan:                        │"
-  echo "   │  bash run-all.sh                                │"
-  echo "   └─────────────────────────────────────────────────┘"
+  echo "   ⚠️  WhatsApp belum terhubung — jalankan:"
+  echo "   bash pair-whatsapp.sh"
 fi
 
 echo ""
