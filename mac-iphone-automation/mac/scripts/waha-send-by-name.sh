@@ -30,15 +30,15 @@ log "INFO" "Mencari kontak: $SEARCH_NAME"
 CONTACTS_JSON=$(curl -sf "${HEADERS[@]}" \
   "${BASE_URL}/api/contacts/all?session=${SESSION}&limit=500&sortBy=name&sortOrder=asc")
 
-MATCH=$(python3 - "$SEARCH_NAME" <<'PY'
+MATCH=$(python3 - "$SEARCH_NAME" "$CONTACTS_JSON" <<'PY'
 import json, sys, re
 
 query = sys.argv[1].lower().strip()
-# Normalize: allow partial match on any word chunk
+raw = sys.argv[2]
 words = [w for w in re.split(r"\s+", query) if len(w) > 2]
 
 try:
-    contacts = json.load(sys.stdin)
+    contacts = json.loads(raw)
 except Exception:
     print("ERROR:invalid_json")
     sys.exit(0)
@@ -55,8 +55,7 @@ def score(c):
     ]).lower()
     if query in fields:
         return 100
-    hits = sum(1 for w in words if w in fields)
-    return hits
+    return sum(1 for w in words if w in fields)
 
 best = None
 best_score = 0
@@ -75,7 +74,7 @@ else:
     name = best.get("name") or best.get("pushname") or cid
     print(f"FOUND|{cid}|{name}|{best_score}")
 PY
-<<< "$CONTACTS_JSON")
+)
 
 if [[ "$MATCH" == NOTFOUND ]]; then
   log "ERROR" "Kontak tidak ditemukan untuk: $SEARCH_NAME"
@@ -92,4 +91,5 @@ CHAT_ID=$(echo "$MATCH" | cut -d'|' -f2)
 FOUND_NAME=$(echo "$MATCH" | cut -d'|' -f3)
 
 log "INFO" "Kontak ditemukan: $FOUND_NAME ($CHAT_ID)"
-exec "$SCRIPT_DIR/waha-send.sh" "${CHAT_ID/@c.us/}" "$MESSAGE"
+PHONE="${CHAT_ID/@c.us/}"
+exec "$SCRIPT_DIR/waha-send.sh" "$PHONE" "$MESSAGE"
