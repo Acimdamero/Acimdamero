@@ -42,14 +42,27 @@ else
     "$HUB_HOME/config.env" 2>/dev/null || true
 fi
 
-# LaunchAgent (macOS only)
+# LaunchAgent hub daemon (macOS only)
 if [[ "$(uname -s)" == "Darwin" ]] && command -v launchctl >/dev/null 2>&1; then
   mkdir -p "$LAUNCH_AGENTS"
   sed "s|__HUB_HOME__|$HUB_HOME|g" "$REPO_DIR/mac/launchd/com.automation.hub.plist.template" \
     > "$LAUNCH_AGENTS/${PLIST_LABEL}.plist"
   launchctl unload "$LAUNCH_AGENTS/${PLIST_LABEL}.plist" 2>/dev/null || true
   launchctl load "$LAUNCH_AGENTS/${PLIST_LABEL}.plist"
-  echo "    LaunchAgent daemon loaded"
+  echo "    LaunchAgent hub daemon loaded"
+
+  # Docker + WAHA autostart (optional, enabled by default)
+  if [[ "${INSTALL_DOCKER_AUTOSTART:-1}" == "1" ]]; then
+    sed -e "s|__HUB_HOME__|$HUB_HOME|g" -e "s|__REPO_DIR__|$REPO_DIR|g" \
+      "$REPO_DIR/mac/launchd/com.automation.docker-waha.plist.template" \
+      > "$LAUNCH_AGENTS/com.automation.docker-waha.plist"
+    grep -q '^AUTOMATION_REPO=' "$HUB_HOME/config.env" 2>/dev/null && \
+      sed -i.bak "s|^AUTOMATION_REPO=.*|AUTOMATION_REPO=$REPO_DIR|" "$HUB_HOME/config.env" || \
+      echo "AUTOMATION_REPO=$REPO_DIR" >> "$HUB_HOME/config.env"
+    launchctl unload "$LAUNCH_AGENTS/com.automation.docker-waha.plist" 2>/dev/null || true
+    launchctl load "$LAUNCH_AGENTS/com.automation.docker-waha.plist"
+    echo "    LaunchAgent docker-waha autostart loaded"
+  fi
 else
   echo "    LaunchAgent skipped (macOS only)"
 fi

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.automation.docker-waha</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__HUB_HOME__/scripts/docker-autostart.sh</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>StandardOutPath</key>
+  <string>__HUB_HOME__/logs/docker-autostart.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HUB_HOME__/logs/docker-autostart.stderr.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>AUTOMATION_HUB_HOME</key>
+    <string>__HUB_HOME__</string>
+    <key>HUB_CONFIG</key>
+    <string>__HUB_HOME__/config.env</string>
+    <key>AUTOMATION_REPO</key>
+    <string>__REPO_DIR__</string>
+  </dict>
+</dict>
+</plist>

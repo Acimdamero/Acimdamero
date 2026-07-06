@@ -85,6 +85,7 @@ echo "╠═══════════════════════�
 echo "║ Mac: scan QR → http://localhost:3000         ║"
 echo "║ iPhone: iphone/INSTALL-IPHONE.md             ║"
 echo "║ Test WA:                                     ║"
+echo "║  bash enable-docker-autostart.sh  (otomatis) ║"
 echo "║  ~/.automation-hub/run-task.sh waha-send-name\\"
 echo "║    \"agwen acim damero jerman\" \"Test Hub\"       ║"
 echo "╚══════════════════════════════════════════════╝"
