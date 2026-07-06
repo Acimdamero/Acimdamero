@@ -1,0 +1,74 @@
+#!/bin/bash
+# Entry point utama — dipanggil dari iPhone (SSH) atau daemon hub.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "$SCRIPT_DIR/lib.sh"
+
+load_config
+
+usage() {
+  cat <<'EOF'
+Automation Hub — run-task.sh
+
+Usage:
+  run-task.sh <command> [args...]
+
+Commands:
+  status              Status Mac (disk, uptime, battery jika laptop)
+  backup [target]     Backup folder ke Google Drive
+  open-app <name>     Buka aplikasi Mac
+  quit-app <name>     Tutup aplikasi Mac
+  sleep               Tidurkan Mac
+  wake                Bangunkan layar Mac
+  cursor-pull <dir>   Git pull di project Cursor
+  cursor-build <dir>  npm run build (jika ada package.json)
+  queue-process       Proses antrian dari Google Sheet
+  help                Tampilkan bantuan ini
+
+Contoh:
+  run-task.sh status
+  run-task.sh backup documents
+  run-task.sh open-app Safari
+  run-task.sh cursor-pull ~/Developer/my-app
+EOF
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  status)
+    exec "$SCRIPT_DIR/status.sh" "$@"
+    ;;
+  backup)
+    exec "$SCRIPT_DIR/backup.sh" "$@"
+    ;;
+  open-app|quit-app)
+    exec "$SCRIPT_DIR/app-control.sh" "$cmd" "$@"
+    ;;
+  sleep)
+    log "INFO" "Sleep requested"
+    pmset sleepnow
+    ;;
+  wake)
+    log "INFO" "Wake requested"
+    caffeinate -u -t 2
+    ;;
+  cursor-pull|cursor-build)
+    exec "$SCRIPT_DIR/cursor-workflow.sh" "$cmd" "$@"
+    ;;
+  queue-process)
+    exec "$SCRIPT_DIR/queue-processor.sh" "$@"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    log "ERROR" "Unknown command: $cmd"
+    usage
+    exit 1
+    ;;
+esac
