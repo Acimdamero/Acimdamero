@@ -51,8 +51,34 @@ function doGetWhatsApp(e) {
   return null;
 }
 
+/** WAHA webhook inbound — hub=waha query param */
+function processWahaPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    if (body.event !== 'message' && body.event !== 'message.any') {
+      return null;
+    }
+    const payload = body.payload || body;
+    const from = payload.from || '';
+    const text = (payload.body || payload.text || '').toString();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Inbox');
+    if (!sheet) sheet = ss.insertSheet('Inbox');
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['timestamp', 'from', 'message', 'type', 'status', 'backend']);
+    }
+    sheet.appendRow([new Date().toISOString(), from, text, 'text', 'new', 'waha']);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return null;
+  }
+}
+
 /** Call from merged doPost — WhatsApp inbound */
 function processWhatsAppPost(e) {
+  const wahaResult = processWahaPost(e);
+  if (wahaResult) return wahaResult;
   try {
     const body = JSON.parse(e.postData.contents);
     if (body.object === 'whatsapp_business_account') {

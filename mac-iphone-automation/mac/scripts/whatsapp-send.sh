@@ -9,6 +9,16 @@ source "$SCRIPT_DIR/lib.sh"
 
 load_config
 
+BACKEND="${WHATSAPP_BACKEND:-meta}"
+
+if [[ "${WHATSAPP_BACKEND_FORCE:-}" == "meta" ]]; then
+  BACKEND="meta"
+fi
+
+if [[ "$BACKEND" == "waha" ]]; then
+  exec "$SCRIPT_DIR/waha-send.sh" "$@"
+fi
+
 TO="${1:?Recipient phone E.164 digits e.g. 6281234567890}"
 MESSAGE="${2:?Message text required}"
 

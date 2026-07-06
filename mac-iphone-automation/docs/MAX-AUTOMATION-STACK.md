@@ -13,7 +13,7 @@ Dokumen ini memetakan **setiap batasan** yang Anda hadapi → **solusi konkret**
 | 1 | Cloud Agent tidak akses iPhone langsung | Google Sheet + webhook + Pushcut | ✅ Teratasi |
 | 2 | Shortcuts tidak jalan background | Pushcut Automation Server + trigger WiFi/Time | ✅ ~95% |
 | 3 | iPhone tidak dikontrol dari Mac | Sheet antrian `device=iphone` + poll/Pushcut | ✅ Teratasi |
-| 4 | WhatsApp tidak auto-send personal | **WhatsApp Business API** via `whatsapp-send.sh` | ✅ 100% kirim |
+| 4 | WhatsApp tidak auto-send personal | **WAHA** (`waha-send.sh`) atau Meta API | ✅ 100% kirim |
 | 5 | WhatsApp tidak bisa baca inbox | Business API webhook inbound + forward ke Sheet | ✅ Pesan masuk tercatat |
 | 6 | Poll Sheet lambat (15 menit) | Pushcut instant webhook `<1 detik` | ✅ Teratasi |
 | 7 | Akses akun/password | 1Password CLI + Keychain | ✅ Teratasi |

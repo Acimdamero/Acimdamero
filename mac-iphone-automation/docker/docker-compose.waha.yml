@@ -1,0 +1,23 @@
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: automation-hub-waha
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_API_KEY: ${WAHA_API_KEY:-change-me-in-production}
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:-change-me}
+      # Webhook ke Apps Script atau Mac relay — isi setelah deploy
+      # WAHA_WEBHOOK_URL: https://script.google.com/macros/s/XXX/exec?hub=waha
+      WAHA_WEBHOOK_EVENTS: message,message.any,session.status
+      WAHA_PRINT_QR: "true"
+    volumes:
+      - waha-sessions:/app/.sessions
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  waha-sessions:

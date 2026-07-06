@@ -28,7 +28,9 @@ Commands:
   queue-process       Proses antrian dari Google Sheet
   pushcut <shortcut> [input]  Trigger iPhone via Pushcut (instant)
   iphone-dispatch <cmd> [args]  Kirim perintah ke iPhone (Pushcut/Sheet)
-  whatsapp-send <phone> <msg>   Kirim WA full-auto (Business API)
+  whatsapp-send <phone> <msg>   Kirim WA (backend: meta|waha)
+  waha-send <phone> <msg>       Kirim WA via WAHA self-hosted
+  waha-status                   Cek session WAHA
   help                Tampilkan bantuan ini
 
 Contoh:
