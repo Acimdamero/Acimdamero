@@ -63,7 +63,12 @@ start_waha() {
 
   export WAHA_API_KEY="$API_KEY"
   log "Start WAHA container..."
-  docker compose -f "$COMPOSE_FILE" up -d >>"$LOG" 2>&1
+  if [[ -t 1 ]] || [[ "${SHOW_DOCKER_OUTPUT:-0}" == "1" ]]; then
+    log "   (download image pertama kali bisa 5-15 menit — tunggu...)"
+    docker compose -f "$COMPOSE_FILE" up -d 2>&1 | tee -a "$LOG"
+  else
+    docker compose -f "$COMPOSE_FILE" up -d >>"$LOG" 2>&1
+  fi
 
   sleep 5
 

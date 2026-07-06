@@ -38,7 +38,8 @@ echo "▶ [1/4] Start Docker + WAHA..."
 if [[ "$(uname -s)" == "Darwin" ]]; then
   export AUTOMATION_REPO="$REPO_DIR"
   export OPEN_WAHA_DASHBOARD=0
-  bash "$REPO_DIR/mac/scripts/docker-autostart.sh" 2>/dev/null || {
+  export SHOW_DOCKER_OUTPUT=1
+  bash "$REPO_DIR/mac/scripts/docker-autostart.sh" || {
     open -a Docker 2>/dev/null || true
     for i in $(seq 1 90); do docker info >/dev/null 2>&1 && break; sleep 2; done
     export WAHA_API_KEY="$API_KEY"
