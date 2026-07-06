@@ -16,7 +16,7 @@ PORT = int(os.environ.get("WAHA_WEBHOOK_PORT", "8765"))
 BASE_URL = os.environ.get("WAHA_BASE_URL", "http://127.0.0.1:3000")
 API_KEY = os.environ.get("WAHA_API_KEY", "automation-hub-test-key")
 SESSION = os.environ.get("WAHA_SESSION", "default")
-HUB_HOME = os.environ.expanduser(os.environ.get("AUTOMATION_HUB_HOME", "~/.automation-hub"))
+HUB_HOME = os.path.expanduser(os.environ.get("AUTOMATION_HUB_HOME", "~/.automation-hub"))
 LOG_FILE = os.path.join(HUB_HOME, "logs", "waha-inbox.log")
 AUTO_REPLY = os.environ.get("WAHA_AUTO_REPLY", "1") == "1"
 REPLY_PREFIX = os.environ.get("WAHA_REPLY_PREFIX", "🤖 Hub auto-reply")
