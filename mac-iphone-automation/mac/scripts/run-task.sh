@@ -30,6 +30,7 @@ Commands:
   iphone-dispatch <cmd> [args]  Kirim perintah ke iPhone (Pushcut/Sheet)
   whatsapp-send <phone> <msg>   Kirim WA (backend: meta|waha)
   waha-send <phone> <msg>       Kirim WA via WAHA self-hosted
+  waha-send-name <name> [msg]   Cari kontak by name + kirim (WAHA)
   waha-status                   Cek session WAHA
   help                Tampilkan bantuan ini
 
