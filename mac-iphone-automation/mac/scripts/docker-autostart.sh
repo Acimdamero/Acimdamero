@@ -103,11 +103,11 @@ start_waha() {
 log "=== Docker autostart begin ==="
 
 # Cegah 2 proses pull bersamaan (whatsapp-setup + LaunchAgent)
-exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   log "Proses lain sedang jalan — skip (normal)"
   exit 0
 fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
 start_docker_desktop
 start_waha
