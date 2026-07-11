@@ -172,9 +172,14 @@ function parseTime_(t) {
   return d.getTime();
 }
 
-/** GET ?action=edtime-schedule | cursor-edtime-export */
+/** GET ?action=edtime-schedule | cursor-edtime-export | setup-edtime */
 function doGetEdtime(e) {
   const action = (e.parameter.action || '').toLowerCase();
+
+  if (action === 'setup-edtime') {
+    return jsonOk_(setupEdtimeTabs_());
+  }
+
   if (!action.startsWith('edtime') && action !== 'cursor-edtime-export') return null;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -219,4 +224,35 @@ function jsonOk_(obj) {
 
 function addSampleEdtimeCommand() {
   appendCommand('iphone', 'edtime-fetch', 'week=current', 'pending');
+}
+
+/** Auto-create all edtime Sheet tabs — call GET ?action=setup-edtime */
+function setupEdtimeTabs_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tabs = [
+    { name: EDTIME_TABS.schedule, headers: [
+      'id', 'date', 'start_time', 'end_time', 'shift_code', 'break_minutes',
+      'location', 'status', 'raw_source', 'synced_at', 'notes',
+    ]},
+    { name: EDTIME_TABS.raw, headers: ['timestamp', 'device', 'payload_type', 'payload_json'] },
+    { name: EDTIME_TABS.screenshots, headers: [
+      'timestamp', 'device', 'screen_type', 'filename', 'drive_path', 'notes',
+    ]},
+    { name: EDTIME_TABS.cursor, headers: ['exported_at', 'record_count', 'json_summary'] },
+    { name: EDTIME_TABS.session, headers: ['timestamp', 'device', 'status', 'extra'] },
+    { name: 'CursorExportRows', headers: [
+      'date', 'start_time', 'end_time', 'shift_code', 'break_minutes',
+      'hours_worked', 'location', 'status', 'source', 'berichtsheft_template',
+    ]},
+  ];
+  const created = [];
+  tabs.forEach(function (t) {
+    let sheet = ss.getSheetByName(t.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(t.name);
+      created.push(t.name);
+    }
+    if (sheet.getLastRow() === 0) sheet.appendRow(t.headers);
+  });
+  return { ok: true, created: created, message: 'edtime tabs ready' };
 }

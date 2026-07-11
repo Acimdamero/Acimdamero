@@ -39,6 +39,8 @@ Commands:
   edtime-process                Proses inbox Drive + merge Sheet
   edtime-export                 Export latest.json untuk Cursor
   edtime-status                 Status export edtime
+  edtime-monitor [status|watch] Dashboard monitor (Anda)
+  edtime-agent [run|sync|...]   Orchestrator agentic
   edtime-credentials            Simpan webhook/user edtime ke Keychain
   help                Tampilkan bantuan ini
 
@@ -118,6 +120,12 @@ case "$cmd" in
     ;;
   edtime-credentials)
     exec "$SCRIPT_DIR/edtime-save-credentials.sh" "$@"
+    ;;
+  edtime-monitor)
+    exec "$SCRIPT_DIR/edtime-monitor.sh" "$@"
+    ;;
+  edtime-agent)
+    exec "$SCRIPT_DIR/edtime-agent-orchestrator.sh" "$@"
     ;;
   help|-h|--help)
     usage

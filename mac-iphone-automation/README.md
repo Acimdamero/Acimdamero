@@ -79,6 +79,15 @@ bash setup-edtime-sync.sh          # wizard: Keychain, Drive, Sheet tabs
 
 Panduan lengkap: [`docs/SETUP-EDTIME-SYNC.md`](docs/SETUP-EDTIME-SYNC.md)
 
+**Agentic (Anda hanya monitor):** [`docs/AGENTIC-MONITOR-GUIDE.md`](docs/AGENTIC-MONITOR-GUIDE.md)
+
+```bash
+cp config/secrets.example.env ~/.automation-hub/secrets.env
+# isi GOOGLE_SHEET_ID + HUB_WEBHOOK_URL
+bash run-edtime-agentic.sh
+bash mac/scripts/edtime-monitor.sh watch
+```
+
 ## Quick start (iPhone)
 
 Ikuti [`iphone/SHORTCUTS-GUIDE.md`](iphone/SHORTCUTS-GUIDE.md):
