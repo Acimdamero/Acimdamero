@@ -57,7 +57,6 @@ for idx, row in enumerate(rows, start=2):
         # Pipe-separated args (e.g. whatsapp-send 628xxx|message)
         if "|" in args_str and str(command).strip() in (
             "whatsapp-send", "waha-send", "iphone-dispatch", "pushcut",
-            "edtime-fetch", "edtime-sync",
         ):
             cmd.extend(args_str.split("|", 1))
         else:

@@ -1,0 +1,58 @@
+{
+  "$schema": "edtime-sync/edtime-mapping/v1",
+  "description": "Mapping data edtime → export Cursor / Berichtsheft. Salin ke ~/.edtime-sync/edtime-mapping.json",
+  "edtime_app": {
+    "name": "edtime Mitarbeiter-App",
+    "bundle_hint": "de.edpep.app",
+    "url_schemes": ["edpep://", "edtime://"],
+    "web_login_url": "https://www.edtime.de/"
+  },
+  "screenshot": {
+    "album_name": "Screenshots",
+    "max_age_minutes": 5,
+    "drive_subfolder": "Edtime Sync/Screenshots",
+    "screens_to_capture": ["schichtplan", "stundenzettel", "dashboard"]
+  },
+  "sheet_tabs": {
+    "schedule": "EdtimeSchedule",
+    "raw": "EdtimeRaw",
+    "screenshots": "EdtimeScreenshots",
+    "cursor_export": "CursorExport",
+    "session_log": "EdtimeSession"
+  },
+  "schedule_fields": {
+    "date": "A",
+    "start_time": "B",
+    "end_time": "C",
+    "shift_code": "D",
+    "break_minutes": "E",
+    "location": "F",
+    "status": "G",
+    "raw_source": "H",
+    "synced_at": "I",
+    "notes": "J"
+  },
+  "cursor_export_fields": [
+    "date",
+    "start_time",
+    "end_time",
+    "shift_code",
+    "break_minutes",
+    "hours_worked",
+    "location",
+    "status",
+    "source",
+    "berichtsheft_taetigkeit_template"
+  ],
+  "berichtsheft_templates": {
+    "default": "Arbeitszeit laut edtime: {start_time}–{end_time}, Schicht {shift_code}",
+    "SpV": "Spätschicht ({start_time}–{end_time}) — Tätigkeiten gemäß Einsatzplan",
+    "F": "Frühschicht ({start_time}–{end_time}) — Tätigkeiten gemäß Einsatzplan"
+  },
+  "sync_schedule": {
+    "iphone_poll_minutes": 15,
+    "mac_process_after_fetch": true,
+    "auto_export_cursor": true,
+    "notify_on_complete": true
+  }
+}

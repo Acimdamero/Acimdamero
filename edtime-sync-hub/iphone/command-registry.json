@@ -1,0 +1,9 @@
+{
+  "$schema": "edtime-sync-hub/iphone-commands/v1",
+  "commands": [
+    { "command": "edtime-open", "shortcut_action": "Open App edtime Mitarbeiter-App" },
+    { "command": "edtime-fetch", "args_format": "week=current", "shortcut_action": "Run Shortcut Hub — edtime Fetch" },
+    { "command": "edtime-login", "shortcut_action": "Run Shortcut Hub — edtime Login Assist" },
+    { "command": "notify", "args_format": "message", "shortcut_action": "Show Notification" }
+  ]
+}

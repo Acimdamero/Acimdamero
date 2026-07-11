@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.edtime.sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__SYNC_HOME__/agent/edtime-schedule.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key>
+  <string>__SYNC_HOME__/logs/edtime-sync.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>__SYNC_HOME__/logs/edtime-sync.stderr.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>EDTIME_SYNC_HOME</key>
+    <string>__SYNC_HOME__</string>
+    <key>EDTIME_REPO</key>
+    <string>__REPO_DIR__</string>
+  </dict>
+</dict>
+</plist>

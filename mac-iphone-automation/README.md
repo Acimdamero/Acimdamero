@@ -10,8 +10,9 @@ Pusat otomatisasi untuk **Mac**, **iPhone**, **Google (Drive/Sheets)**, dan **Cu
 | **Kontrol Mac** | Sleep, wake, buka/tutup app — dari iPhone via SSH |
 | **Kontrol iPhone** | Mac tulis perintah ke Google Sheet → iPhone eksekusi via Shortcuts |
 | **Cursor** | Git pull + build project dari iPhone atau agent Cursor |
-| **edtime sync** | Fetch jadwal iPhone (SS) → Sheet/Drive → export JSON untuk Cursor |
 | **Akun** | 1Password CLI + Apple Keychain (tanpa password di file teks) |
+
+> **edtime sync** (jadwal iPhone → Cursor) dipindah ke repo terpisah: [`edtime-sync-hub`](../edtime-sync-hub/)
 
 ## Struktur proyek
 
@@ -29,8 +30,6 @@ mac-iphone-automation/
 
 **Peta lengkap kontrol & integrasi iPhone:**
 
-- [`docs/SETUP-EDTIME-SYNC.md`](docs/SETUP-EDTIME-SYNC.md) — **setup edtime auto-sync → Cursor (SS + Sheet + Drive)**
-- [`docs/EDTIME-BERICHTSHEFT-ARCHITECTURE.md`](docs/EDTIME-BERICHTSHEFT-ARCHITECTURE.md) — **skema jembatan edtime (iPhone) ↔ Berichtsheft**, batasan, pro/kontra
 - [`docs/IPHONE-ARCHITECTURE-MAP.md`](docs/IPHONE-ARCHITECTURE-MAP.md) — lapisan, matriks kontrol, trigger, sync topology
 - [`docs/PERMISSIONS-AND-WORKAROUNDS.md`](docs/PERMISSIONS-AND-WORKAROUNDS.md) — **cara izinkan akses & workaround otomatisasi**
 - [`docs/WAHA-API-GUIDE.md`](docs/WAHA-API-GUIDE.md) — **WAHA self-hosted API (akali WA personal)**
@@ -66,27 +65,17 @@ Test:
 2. Pasang Apps Script — [`google/apps-script/QueueSync.gs`](google/apps-script/QueueSync.gs)
 3. Buat folder Drive `Automation Hub/Backups`
 
-## Quick start (edtime → Cursor)
+## Repo terkait: edtime-sync-hub
+
+Sinkronisasi **edtime** + Google Sheets + Cursor ada di folder/repo terpisah:
 
 ```bash
-bash setup-edtime-sync.sh          # wizard: Keychain, Drive, Sheet tabs
-# iPhone: iphone/EDTIME-SHORTCUTS-SETUP.md
-
-~/.automation-hub/run-task.sh edtime-sync full
-~/.automation-hub/run-task.sh edtime-export
-# Cursor baca: Drive/Automation Hub/Edtime/cursor/latest.json
+cd ../edtime-sync-hub
+bash install-secrets.sh
+bash run-agent.sh
 ```
 
-Panduan lengkap: [`docs/SETUP-EDTIME-SYNC.md`](docs/SETUP-EDTIME-SYNC.md)
-
-**Agentic (Anda hanya monitor):** [`docs/AGENTIC-MONITOR-GUIDE.md`](docs/AGENTIC-MONITOR-GUIDE.md)
-
-```bash
-cp config/secrets.example.env ~/.automation-hub/secrets.env
-# isi GOOGLE_SHEET_ID + HUB_WEBHOOK_URL
-bash run-edtime-agentic.sh
-bash mac/scripts/edtime-monitor.sh watch
-```
+Lihat [`../edtime-sync-hub/README.md`](../edtime-sync-hub/README.md)
 
 ## Quick start (iPhone)
 
@@ -134,9 +123,6 @@ run-task.sh sleep|wake
 run-task.sh cursor-pull ~/Developer/my-app
 run-task.sh cursor-build ~/Developer/my-app
 run-task.sh queue-process
-run-task.sh edtime-sync full
-run-task.sh edtime-export
-run-task.sh edtime-fetch week=current
 ```
 
 ## Keamanan

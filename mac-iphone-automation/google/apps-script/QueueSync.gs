@@ -5,7 +5,7 @@
  * Sheet "Queue" kolom:
  * A: id | B: device (mac|iphone) | C: command | D: status | E: args
  *
- * Pasang juga file EdtimeSync.gs dan WhatsAppInbound.gs di project yang sama.
+ * Pasang juga file WhatsAppInbound.gs di project yang sama.
  */
 
 const SHEET_NAME = 'Queue';
@@ -15,7 +15,6 @@ function onOpen() {
     .createMenu('Automation Hub')
     .addItem('Tambah perintah contoh Mac', 'addSampleMacCommand')
     .addItem('Tambah perintah contoh iPhone', 'addSampleIphoneCommand')
-    .addItem('Tambah edtime-fetch contoh', 'addSampleEdtimeCommand')
     .addToUi();
 }
 
@@ -33,16 +32,12 @@ function appendCommand(device, command, args, status) {
   sheet.appendRow([id, device, command, status || 'pending', args || '']);
 }
 
-/** Web App endpoint — Mac/iPhone POST, WhatsApp inbound, status, edtime */
+/** Web App endpoint — Mac/iPhone POST, WhatsApp inbound, status */
 function doPost(e) {
   const waResult = processWhatsAppPost(e);
   if (waResult) return waResult;
 
   const data = JSON.parse(e.postData.contents);
-
-  const edtimeResult = processEdtimePost(data);
-  if (edtimeResult) return edtimeResult;
-
   if (data.action === 'status' || (data.device && !data.command)) {
     return handleStatus(data);
   }
@@ -54,11 +49,8 @@ function doPost(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/** iPhone Shortcuts polling — GET pending OR WhatsApp verify OR edtime export */
+/** iPhone Shortcuts polling — GET pending OR WhatsApp verify */
 function doGet(e) {
-  const edtimeExport = doGetEdtime(e);
-  if (edtimeExport) return edtimeExport;
-
   const waVerify = doGetWhatsApp(e);
   if (waVerify) return waVerify;
 

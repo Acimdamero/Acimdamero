@@ -1,0 +1,3 @@
+# Secrets — jangan commit dengan webhook asli
+secrets.env
+*.bak

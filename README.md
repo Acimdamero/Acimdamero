@@ -1,5 +1,6 @@
-- 👋 Hi, I’m @Acimdamero
+- 👋 Hi, I'm @Acimdamero
 - 🤖 **Mac ↔ iPhone Automation Hub** — [mac-iphone-automation/README.md](mac-iphone-automation/README.md)
+- 📅 **edtime Sync Hub** (iPhone → Sheets → Cursor) — [edtime-sync-hub/README.md](edtime-sync-hub/README.md)
 - 👀 I’m interested in automation, Apple ecosystem, and AI tooling
 - 🌱 I’m currently learning Cursor agents & cross-device workflows
 - 💞️ I’m looking to collaborate on ...
