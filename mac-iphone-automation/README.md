@@ -10,6 +10,7 @@ Pusat otomatisasi untuk **Mac**, **iPhone**, **Google (Drive/Sheets)**, dan **Cu
 | **Kontrol Mac** | Sleep, wake, buka/tutup app — dari iPhone via SSH |
 | **Kontrol iPhone** | Mac tulis perintah ke Google Sheet → iPhone eksekusi via Shortcuts |
 | **Cursor** | Git pull + build project dari iPhone atau agent Cursor |
+| **edtime sync** | Fetch jadwal iPhone (SS) → Sheet/Drive → export JSON untuk Cursor |
 | **Akun** | 1Password CLI + Apple Keychain (tanpa password di file teks) |
 
 ## Struktur proyek
@@ -28,6 +29,7 @@ mac-iphone-automation/
 
 **Peta lengkap kontrol & integrasi iPhone:**
 
+- [`docs/SETUP-EDTIME-SYNC.md`](docs/SETUP-EDTIME-SYNC.md) — **setup edtime auto-sync → Cursor (SS + Sheet + Drive)**
 - [`docs/EDTIME-BERICHTSHEFT-ARCHITECTURE.md`](docs/EDTIME-BERICHTSHEFT-ARCHITECTURE.md) — **skema jembatan edtime (iPhone) ↔ Berichtsheft**, batasan, pro/kontra
 - [`docs/IPHONE-ARCHITECTURE-MAP.md`](docs/IPHONE-ARCHITECTURE-MAP.md) — lapisan, matriks kontrol, trigger, sync topology
 - [`docs/PERMISSIONS-AND-WORKAROUNDS.md`](docs/PERMISSIONS-AND-WORKAROUNDS.md) — **cara izinkan akses & workaround otomatisasi**
@@ -63,6 +65,19 @@ Test:
 1. Buat Spreadsheet **Automation Queue** — lihat [`google/SHEET-TEMPLATE.md`](google/SHEET-TEMPLATE.md)
 2. Pasang Apps Script — [`google/apps-script/QueueSync.gs`](google/apps-script/QueueSync.gs)
 3. Buat folder Drive `Automation Hub/Backups`
+
+## Quick start (edtime → Cursor)
+
+```bash
+bash setup-edtime-sync.sh          # wizard: Keychain, Drive, Sheet tabs
+# iPhone: iphone/EDTIME-SHORTCUTS-SETUP.md
+
+~/.automation-hub/run-task.sh edtime-sync full
+~/.automation-hub/run-task.sh edtime-export
+# Cursor baca: Drive/Automation Hub/Edtime/cursor/latest.json
+```
+
+Panduan lengkap: [`docs/SETUP-EDTIME-SYNC.md`](docs/SETUP-EDTIME-SYNC.md)
 
 ## Quick start (iPhone)
 
@@ -110,6 +125,9 @@ run-task.sh sleep|wake
 run-task.sh cursor-pull ~/Developer/my-app
 run-task.sh cursor-build ~/Developer/my-app
 run-task.sh queue-process
+run-task.sh edtime-sync full
+run-task.sh edtime-export
+run-task.sh edtime-fetch week=current
 ```
 
 ## Keamanan

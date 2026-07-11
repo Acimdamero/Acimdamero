@@ -102,6 +102,30 @@
       "requires_unlock": true,
       "hub_priority": "medium",
       "notes": "Template: on-my-way, running-late, available"
+    },
+    {
+      "command": "edtime-open",
+      "args_format": "",
+      "shortcut_action": "Open App edtime Mitarbeiter-App",
+      "requires_unlock": true,
+      "hub_priority": "high",
+      "notes": "Buka edtime; session iOS harus sudah login"
+    },
+    {
+      "command": "edtime-fetch",
+      "args_format": "week=current",
+      "shortcut_action": "Run Shortcut Hub — edtime Fetch",
+      "requires_unlock": true,
+      "hub_priority": "critical",
+      "notes": "SS Schichtplan + POST jadwal ke Sheet → Cursor export"
+    },
+    {
+      "command": "edtime-login",
+      "args_format": "",
+      "shortcut_action": "Run Shortcut Hub — edtime Login Assist",
+      "requires_unlock": true,
+      "hub_priority": "high",
+      "notes": "Assist login via iOS Passwords; bukan auto-login penuh"
     }
   ],
   "triggers_recommended": [

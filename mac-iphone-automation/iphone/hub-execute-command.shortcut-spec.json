@@ -71,6 +71,19 @@
       "command": "run-shortcut",
       "args": ["shortcut_name"],
       "actions": ["Run Shortcut"]
+    },
+    {
+      "command": "edtime-open",
+      "actions": ["Open App edtime Mitarbeiter-App", "Fallback Open URL edpep://"]
+    },
+    {
+      "command": "edtime-fetch",
+      "args": ["week"],
+      "actions": ["Run Shortcut Hub — edtime Fetch"]
+    },
+    {
+      "command": "edtime-login",
+      "actions": ["Run Shortcut Hub — edtime Login Assist"]
     }
   ],
   "pushcut_setup": {
@@ -85,6 +98,9 @@
     "3. If command = notify → Show Notification (args joined)",
     "4. If command = whatsapp-chat → Build wa.me URL → Open URL",
     "5. If command = ssh-mac → Run Script Over SSH with run-task.sh",
-    "6. Else → Show Notification Unknown command"
+    "6. If command = edtime-open → Open App edtime",
+    "7. If command = edtime-fetch → Run Shortcut Hub — edtime Fetch",
+    "8. If command = edtime-login → Run Shortcut Hub — edtime Login Assist",
+    "9. Else → Show Notification Unknown command"
   ]
 }

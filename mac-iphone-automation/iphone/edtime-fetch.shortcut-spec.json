@@ -1,0 +1,148 @@
+{
+  "name": "edtime — Fetch & Sync",
+  "description": "Buka edtime, assist login, ambil screenshot (SS), POST jadwal ke Automation Hub untuk Cursor",
+  "version": "1.0",
+  "requires": [
+    "edtime Mitarbeiter-App terinstall",
+    "Login edtime manual minimal sekali (session iOS)",
+    "Web App URL disimpan di iCloud / Notes (dari setup-edtime-sync.sh)",
+    "Google Drive app di iPhone"
+  ],
+  "shortcut_name": "Hub — edtime Fetch",
+  "trigger_automation": {
+    "name": "Hub — Poll edtime Queue",
+    "schedule": "Every 15 minutes",
+    "wifi": "Home SSID optional",
+    "run_immediately": true
+  },
+  "variables_to_create": [
+    {
+      "name": "HubWebhookURL",
+      "type": "Text",
+      "value": "PASTE_APPS_SCRIPT_WEB_APP_URL"
+    }
+  ],
+  "steps": [
+    {
+      "order": 1,
+      "action": "Get Battery Level",
+      "save_as": "Battery"
+    },
+    {
+      "order": 2,
+      "action": "Open App",
+      "app": "edtime Mitarbeiter-App",
+      "note": "Jika app tidak ditemukan, gunakan Open URL edpep://"
+    },
+    {
+      "order": 3,
+      "action": "Wait",
+      "seconds": 4,
+      "note": "Biarkan app load; jika layar login muncul lanjut ke step login-assist"
+    },
+    {
+      "order": 4,
+      "action": "If",
+      "condition": "Shortcut Input contains needs_login OR user sees login screen",
+      "then": [
+        "Run Shortcut Hub — edtime Login Assist",
+        "POST edtime_session status=needs_login to webhook",
+        "Stop Shortcut with message: Login dulu lalu jalankan ulang"
+      ]
+    },
+    {
+      "order": 5,
+      "action": "Show Notification",
+      "text": "Screenshot Schichtplan sekarang (Vol Up + Side Button)",
+      "note": "iOS tidak izinkan screenshot otomatis dari Shortcut ke app lain — user 1 tap SS"
+    },
+    {
+      "order": 6,
+      "action": "Wait",
+      "seconds": 8
+    },
+    {
+      "order": 7,
+      "action": "Find Photos",
+      "filter": "Album Screenshots, Last 5 minutes, Latest 1",
+      "save_as": "LatestSS"
+    },
+    {
+      "order": 8,
+      "action": "Save File",
+      "input": "LatestSS",
+      "destination": "iCloud Drive/Automation Hub/Edtime/Screenshots/",
+      "filename": "edtime-{Date}-schichtplan.png"
+    },
+    {
+      "order": 9,
+      "action": "Ask for Input",
+      "prompt": "Tanggal shift (YYYY-MM-DD) — kosongkan untuk hari ini",
+      "optional": true,
+      "save_as": "ShiftDate"
+    },
+    {
+      "order": 10,
+      "action": "Ask for Input",
+      "prompt": "Jam mulai–selesai (contoh 08:00-16:30)",
+      "save_as": "ShiftTime"
+    },
+    {
+      "order": 11,
+      "action": "Ask for Input",
+      "prompt": "Kode shift (SpV, F, dll.) — opsional",
+      "optional": true,
+      "save_as": "ShiftCode"
+    },
+    {
+      "order": 12,
+      "action": "Text",
+      "template": "Build JSON schedule row from ShiftDate, ShiftTime, ShiftCode"
+    },
+    {
+      "order": 13,
+      "action": "Get Contents of URL",
+      "method": "POST",
+      "url": "HubWebhookURL",
+      "headers": "Content-Type: application/json",
+      "body": "{\"action\":\"edtime_schedule\",\"device\":\"iphone\",\"source\":\"shortcut_fetch\",\"schedule\":[{\"date\":\"...\",\"start_time\":\"...\",\"end_time\":\"...\",\"shift_code\":\"...\",\"raw_source\":\"iphone_ss\"}]}"
+    },
+    {
+      "order": 14,
+      "action": "Get Contents of URL",
+      "method": "POST",
+      "body": "{\"action\":\"edtime_screenshot\",\"device\":\"iphone\",\"screen_type\":\"schichtplan\",\"filename\":\"...\",\"drive_path\":\"iCloud/Automation Hub/Edtime/Screenshots/...\"}"
+    },
+    {
+      "order": 15,
+      "action": "Get Contents of URL",
+      "method": "POST",
+      "body": "{\"action\":\"edtime_session\",\"device\":\"iphone\",\"status\":\"fetch_ok\"}"
+    },
+    {
+      "order": 16,
+      "action": "Show Notification",
+      "text": "edtime sync OK — data ke Sheet/Cursor"
+    }
+  ],
+  "json_body_example": {
+    "action": "edtime_schedule",
+    "device": "iphone",
+    "source": "shortcut_fetch",
+    "schedule": [
+      {
+        "date": "2026-07-11",
+        "start_time": "08:00",
+        "end_time": "16:30",
+        "shift_code": "SpV",
+        "break_minutes": "30",
+        "status": "planned",
+        "raw_source": "iphone_ss"
+      }
+    ]
+  },
+  "semi_auto_mode": {
+    "description": "Untuk mengurangi input manual, isi ShiftTime dari clipboard jika user copy dari edtime",
+    "step": "Get Clipboard → If matches regex \\d{2}:\\d{2}-\\d{2}:\\d{2} use as ShiftTime"
+  }
+}

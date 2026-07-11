@@ -33,6 +33,13 @@ Commands:
   waha-send-name <name> [msg]   Cari kontak by name + kirim (WAHA)
   waha-status                   Cek session WAHA
   waha-auto-reply [start|stop]  Auto-reply pesan masuk (webhook lokal)
+  edtime-open                   Buka edtime di iPhone (dispatch)
+  edtime-fetch [week=current]   Fetch jadwal + SS dari iPhone
+  edtime-sync full              Pipeline lengkap fetch→process→export
+  edtime-process                Proses inbox Drive + merge Sheet
+  edtime-export                 Export latest.json untuk Cursor
+  edtime-status                 Status export edtime
+  edtime-credentials            Simpan webhook/user edtime ke Keychain
   help                Tampilkan bantuan ini
 
 Contoh:
@@ -90,6 +97,27 @@ case "$cmd" in
     ;;
   waha-auto-reply)
     exec "$SCRIPT_DIR/waha-auto-reply.sh" "$@"
+    ;;
+  edtime-open)
+    exec "$SCRIPT_DIR/edtime-sync.sh" open "$@"
+    ;;
+  edtime-fetch)
+    exec "$SCRIPT_DIR/edtime-sync.sh" fetch "$@"
+    ;;
+  edtime-sync)
+    exec "$SCRIPT_DIR/edtime-sync.sh" "$@"
+    ;;
+  edtime-process)
+    exec "$SCRIPT_DIR/edtime-process.sh" run "$@"
+    ;;
+  edtime-export)
+    exec "$SCRIPT_DIR/edtime-export-cursor.sh" "$@"
+    ;;
+  edtime-status)
+    exec "$SCRIPT_DIR/edtime-sync.sh" status "$@"
+    ;;
+  edtime-credentials)
+    exec "$SCRIPT_DIR/edtime-save-credentials.sh" "$@"
     ;;
   help|-h|--help)
     usage

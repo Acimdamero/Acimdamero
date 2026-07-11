@@ -1,0 +1,56 @@
+{
+  "name": "edtime — Login Assist",
+  "description": "Assist login edtime: buka app, isi username dari Keychain Passwords (iOS 18+), user tap login + Face ID",
+  "version": "1.0",
+  "shortcut_name": "Hub — edtime Login Assist",
+  "limitations": [
+    "iOS tidak izinkan auto-submit password tanpa interaksi user",
+    "Face ID / 2FA harus diselesaikan manual",
+    "Setelah login sukses, edtime menyimpan session — fetch berikutnya tidak perlu login"
+  ],
+  "steps": [
+    {
+      "order": 1,
+      "action": "Open App",
+      "app": "edtime Mitarbeiter-App"
+    },
+    {
+      "order": 2,
+      "action": "Wait",
+      "seconds": 3
+    },
+    {
+      "order": 3,
+      "action": "Find Passwords",
+      "search": "edtime",
+      "note": "iOS 18+ Passwords action — cari entri edtime / eurodata / employer URL"
+    },
+    {
+      "order": 4,
+      "action": "If",
+      "condition": "Password found",
+      "then": [
+        "Copy Username to Clipboard",
+        "Show Notification: Paste username di field login edtime",
+        "Copy Password to Clipboard (expires)",
+        "Show Notification: Paste password lalu tap Anmelden/Login"
+      ],
+      "else": [
+        "Show Alert: Simpan password edtime di Settings → Passwords dulu",
+        "Open URL https://www.edtime.de/ in Safari as fallback"
+      ]
+    },
+    {
+      "order": 5,
+      "action": "Get Contents of URL",
+      "method": "POST",
+      "url": "HubWebhookURL",
+      "body": "{\"action\":\"edtime_session\",\"device\":\"iphone\",\"status\":\"login_assist_shown\"}"
+    }
+  ],
+  "first_time_setup": [
+    "Login edtime manual sekali di app",
+    "Atau: Settings → Passwords → Add — website edtime.de + kredensial employer",
+    "Centang 'Remember me' di app jika tersedia"
+  ]
+}
