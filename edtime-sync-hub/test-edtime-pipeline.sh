@@ -57,7 +57,7 @@ echo ""
 echo "▶ Webhook API"
 URL="$(security find-generic-password -s edtime-sync -a webhook-url -w 2>/dev/null || true)"
 if [[ -n "$URL" ]]; then
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" "${URL%%\?*}?action=setup-edtime" 2>/dev/null || echo "000")
+  CODE=$(curl -sL -o /dev/null -w "%{http_code}" "${URL%%\?*}?action=setup-edtime" 2>/dev/null || echo "000")
   [[ "$CODE" == "200" ]] && ok "setup-edtime HTTP 200" || echo "  ⏭️  setup-edtime HTTP $CODE (redeploy Apps Script)"
 else
   echo "  ⏭️  webhook skip"

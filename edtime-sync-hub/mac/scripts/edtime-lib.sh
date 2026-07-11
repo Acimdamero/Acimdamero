@@ -61,7 +61,7 @@ edtime_post_json() {
   local payload="$1"
   local url
   url="$(edtime_webhook_url)"
-  curl -sf -X POST "$url" \
+  curl -sfL -X POST "$url" \
     -H "Content-Type: application/json" \
     -d "$payload"
 }
@@ -72,9 +72,9 @@ edtime_get_export() {
   # Strip trailing slash, append query
   url="${url%/}"
   if [[ "$url" == *"?"* ]]; then
-    curl -sf "${url}&action=${action}"
+    curl -sfL "${url}&action=${action}"
   else
-    curl -sf "${url}?action=${action}"
+    curl -sfL "${url}?action=${action}"
   fi
 }
 

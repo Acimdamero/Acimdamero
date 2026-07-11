@@ -62,8 +62,8 @@ check_webhook_setup() {
   local url
   url="$(edtime_webhook_url 2>/dev/null || true)"
   [[ -n "$url" ]] || return 1
-  curl -sf "${url%%\?*}?action=setup-edtime" >/dev/null 2>&1 && return 0
-  curl -sf "$url" >/dev/null 2>&1
+  curl -sfL "${url%%\?*}?action=setup-edtime" >/dev/null 2>&1 && return 0
+  curl -sfL "$url" >/dev/null 2>&1
 }
 
 phase_install() {

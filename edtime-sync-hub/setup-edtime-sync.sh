@@ -78,7 +78,7 @@ if [[ "$NON_INTERACTIVE" == "1" ]]; then
   if [[ -n "$WEBHOOK_URL" ]]; then
     bash "$SCRIPTS/edtime-save-credentials.sh" webhook "$WEBHOOK_URL"
     echo "✓ Webhook disimpan (non-interactive)"
-    curl -sf "${WEBHOOK_URL%%\?*}?action=setup-edtime" >/dev/null 2>&1 && \
+    curl -sfL "${WEBHOOK_URL%%\?*}?action=setup-edtime" >/dev/null 2>&1 && \
       echo "✓ Sheet tabs edtime diinisialisasi via Apps Script" || \
       echo "⚠ setup-edtime API belum deploy — paste EdtimeWebApp.gs & redeploy"
   else
@@ -92,7 +92,7 @@ else
   if [[ -n "${WEBHOOK_URL:-}" ]]; then
     bash "$SCRIPTS/edtime-save-credentials.sh" webhook "$WEBHOOK_URL"
     echo "✓ Webhook disimpan di Keychain"
-    curl -sf "${WEBHOOK_URL%%\?*}?action=setup-edtime" >/dev/null 2>&1 && \
+    curl -sfL "${WEBHOOK_URL%%\?*}?action=setup-edtime" >/dev/null 2>&1 && \
       echo "✓ Sheet tabs edtime diinisialisasi" || true
   fi
 fi

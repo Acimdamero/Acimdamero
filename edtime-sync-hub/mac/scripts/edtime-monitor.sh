@@ -81,7 +81,7 @@ print_webhook() {
   echo "── Webhook ──"
   if url="$(get_keychain_secret webhook-url 2>/dev/null)"; then
     echo "  ✅ Keychain: ${url:0:50}..."
-    code=$(curl -s -o /dev/null -w "%{http_code}" "${url%%\?*}?action=cursor-edtime-export" 2>/dev/null || echo "000")
+    code=$(curl -sL -o /dev/null -w "%{http_code}" "${url%%\?*}?action=cursor-edtime-export" 2>/dev/null || echo "000")
     echo "  HTTP cursor-edtime-export: $code"
   else
     echo "  ❌ webhook-url belum di Keychain"

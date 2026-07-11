@@ -62,9 +62,9 @@ Atau via terminal:
 ## Step 3 — Test webhook
 
 ```bash
-curl "https://script.google.com/macros/s/.../exec?device=iphone"
-curl "https://script.google.com/macros/s/.../exec?action=cursor-edtime-export"
-curl "https://script.google.com/macros/s/.../exec?action=setup-edtime"
+curl -sL "https://script.google.com/macros/s/.../exec?device=iphone"
+curl -sL "https://script.google.com/macros/s/.../exec?action=cursor-edtime-export"
+curl -sL "https://script.google.com/macros/s/.../exec?action=setup-edtime"
 ```
 
 Harus return **JSON** (bukan HTML error).
