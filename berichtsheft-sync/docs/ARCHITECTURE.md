@@ -40,6 +40,10 @@ Alur: Worker baca Keychain → login BLok → isi form → kirim preview ke Tele
 
 **Kesimpulan ideal:** Satu Mac sebagai **“stasiun robot”** (API + worker + Keychain). HP hanya bot. Tailscale opsional agar API aman dari internet.
 
+### PC kantor / Cursor Cloud (bukan stasiun robot)
+
+Edit **katalog kegiatan** di kantor lewat GitHub saja — **jangan** jalankan bot/BLok/Keychain di PC kantor, dan **jangan** sambungkan LAN kantor ke MacBook. Panduan: [DUA_KOMPUTER.md](DUA_KOMPUTER.md).
+
 ---
 
 ## Komponen

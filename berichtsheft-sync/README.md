@@ -41,6 +41,7 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
 | [docs/LANDASAN.md](docs/LANDASAN.md) | Latar belakang, masalah, tujuan, ruang lingkup |
 | [docs/SETUP.md](docs/SETUP.md) | **Panduan setup urutan lengkap (wajib)** |
 | [docs/KATALOG_KEGIATAN.md](docs/KATALOG_KEGIATAN.md) | **Kegiatan per Abteilung — pantau & edit** |
+| [docs/DUA_KOMPUTER.md](docs/DUA_KOMPUTER.md) | **PC kantor + MacBook tanpa ganggu jaringan admin** |
 | [docs/TECH_STACK.md](docs/TECH_STACK.md) | Teknologi dan alasan pemilihan |
 | [docs/PROSES_PEMBUATAN.md](docs/PROSES_PEMBUATAN.md) | Kronologi pengembangan |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | Status implementasi terkini |
@@ -75,15 +76,17 @@ python3 -m berichtsheft test-flow
 Sumber kebenaran: [`data/katalog_abteilung.json`](data/katalog_abteilung.json)  
 Ringkasan terbaca: [`docs/KATALOG_KEGIATAN.md`](docs/KATALOG_KEGIATAN.md)
 
+**PC kantor (Cursor) vs MacBook:** lihat [`docs/DUA_KOMPUTER.md`](docs/DUA_KOMPUTER.md) — edit katalog di kantor lewat GitHub; DB/bot/BLok tetap hanya di Mac. Tidak perlu VPN atau sambung ke laptop.
+
 ```bash
-# pantau
+# pantau (boleh di mana saja)
 python3 -m berichtsheft catalog
 python3 -m berichtsheft catalog --abteilung Service
 python3 -m berichtsheft catalog --code BRF
-python3 -m berichtsheft catalog --db          # isi SQLite runtime
 
-# setelah edit JSON
-python3 -m berichtsheft catalog --reload --write-md
+# di MacBook setelah git pull dari edit kantor:
+./scripts/sync_katalog_from_git.sh
+# atau: python3 -m berichtsheft catalog --reload --write-md
 ```
 
 ### Operasi harian

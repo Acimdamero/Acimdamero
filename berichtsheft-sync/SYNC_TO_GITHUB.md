@@ -25,3 +25,10 @@ lalu:
 ```bash
 python3 -m berichtsheft catalog --reload --write-md
 ```
+
+## PC kantor vs MacBook
+
+Lihat [docs/DUA_KOMPUTER.md](docs/DUA_KOMPUTER.md).
+
+- **Kantor / Cursor:** edit JSON → `git push` (tidak perlu DB lokal / bot / BLok).
+- **MacBook:** `git pull` lalu `./scripts/sync_katalog_from_git.sh`.
