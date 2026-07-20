@@ -1,0 +1,1328 @@
+From 57ee62486773606ff1fc7532204dd025f75258b8 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Mon, 20 Jul 2026 14:58:36 +0000
+Subject: [PATCH] feat: katalog kegiatan per Abteilung untuk pantau dan edit
+
+Menambahkan data/katalog_abteilung.json sebagai sumber kebenaran
+kegiatan (BRF, BAF, Housekeeping, Tagungen, FS2, Schule, dll.),
+CLI catalog, endpoint API /catalog, dan docs KATALOG_KEGIATAN.md.
+---
+ AGENTS.md                     |   4 +-
+ README.md                     |  25 +++-
+ berichtsheft/api_server.py    |  26 +++-
+ berichtsheft/areas.py         |   7 +-
+ berichtsheft/catalog.py       | 261 ++++++++++++++++++++++++++++++++++
+ berichtsheft/cli.py           |  92 +++++++++++-
+ berichtsheft/seed.py          |  18 ++-
+ data/areas_hotel.json         |  90 +++++++++++-
+ data/blok_mapping.yaml        |   6 +
+ data/katalog_abteilung.json   | 205 ++++++++++++++++++++++++++
+ data/templates_hotelfach.json |  47 +++---
+ docs/KATALOG_KEGIATAN.md      | 178 +++++++++++++++++++++++
+ docs/PROGRESS.md              |   1 +
+ tests/test_catalog.py         |  63 ++++++++
+ 14 files changed, 987 insertions(+), 36 deletions(-)
+ create mode 100644 berichtsheft/catalog.py
+ create mode 100644 data/katalog_abteilung.json
+ create mode 100644 docs/KATALOG_KEGIATAN.md
+ create mode 100644 tests/test_catalog.py
+
+diff --git a/AGENTS.md b/AGENTS.md
+index 46c3022..9b10efb 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -3,5 +3,7 @@
+ - Mode A default: no BLok/EdTime credentials in repo.
+ - EdTime: Azubi = import JSON only, no web login adapter until employer provides API/export.
+ - Never commit `.env`, HAR, screenshots with tokens.
+-- Generator must not invent activities outside `templates_hotelfach.json` pool.
++- Activity / Abteilung source of truth: `data/katalog_abteilung.json` (not invent outside this pool).
++- After editing the katalog: `python3 -m berichtsheft catalog --reload --write-md`.
++- Generator must not invent activities outside the katalog / `templates_hotelfach.json` pool.
+ - Free days (`frei` / Ausgang): never push to BLok.
+diff --git a/README.md b/README.md
+index d149132..9a2e3a2 100644
+--- a/README.md
++++ b/README.md
+@@ -40,6 +40,7 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
+ |------|-----|
+ | [docs/LANDASAN.md](docs/LANDASAN.md) | Latar belakang, masalah, tujuan, ruang lingkup |
+ | [docs/SETUP.md](docs/SETUP.md) | **Panduan setup urutan lengkap (wajib)** |
++| [docs/KATALOG_KEGIATAN.md](docs/KATALOG_KEGIATAN.md) | **Kegiatan per Abteilung — pantau & edit** |
+ | [docs/TECH_STACK.md](docs/TECH_STACK.md) | Teknologi dan alasan pemilihan |
+ | [docs/PROSES_PEMBUATAN.md](docs/PROSES_PEMBUATAN.md) | Kronologi pengembangan |
+ | [docs/PROGRESS.md](docs/PROGRESS.md) | Status implementasi terkini |
+@@ -65,9 +66,26 @@ cp config.example.yaml config.yaml   # sesuaikan selector BLok
+ 
+ python3 -m berichtsheft init
+ python3 -m berichtsheft import data/shifts_kw23_24.json
++python3 -m berichtsheft catalog          # lihat kegiatan per Abteilung
+ python3 -m berichtsheft test-flow
+ ```
+ 
++### Edit kegiatan / Abteilung
++
++Sumber kebenaran: [`data/katalog_abteilung.json`](data/katalog_abteilung.json)  
++Ringkasan terbaca: [`docs/KATALOG_KEGIATAN.md`](docs/KATALOG_KEGIATAN.md)
++
++```bash
++# pantau
++python3 -m berichtsheft catalog
++python3 -m berichtsheft catalog --abteilung Service
++python3 -m berichtsheft catalog --code BRF
++python3 -m berichtsheft catalog --db          # isi SQLite runtime
++
++# setelah edit JSON
++python3 -m berichtsheft catalog --reload --write-md
++```
++
+ ### Operasi harian
+ 
+ 1. Import jadwal EdTime (JSON) — mingguan
+@@ -85,13 +103,18 @@ python3 -m berichtsheft test-flow
+ ```
+ berichtsheft-sync/
+ ├── berichtsheft/       # Modul Python utama
++│   ├── catalog.py      # Katalog kegiatan per Abteilung
+ │   ├── cli.py          # Perintah CLI
+ │   ├── telegram_bot.py # Bot Telegram
+ │   ├── api_server.py   # REST API lokal
+ │   ├── orchestrator.py # Gabung log → draft
+ │   ├── blok_worker.py  # Playwright BLok
+ │   └── ...
+-├── data/               # Template, jadwal contoh, mapping
++├── data/
++│   ├── katalog_abteilung.json  # ← edit kegiatan di sini
++│   ├── areas_hotel.json        # sync otomatis dari katalog
++│   ├── templates_hotelfach.json
++│   └── blok_mapping.yaml
+ ├── docs/               # Dokumentasi
+ ├── scripts/            # Utilitas (probe, explore, WiFi)
+ ├── tests/              # Unit test
+diff --git a/berichtsheft/api_server.py b/berichtsheft/api_server.py
+index fd91f57..e19f0c5 100644
+--- a/berichtsheft/api_server.py
++++ b/berichtsheft/api_server.py
+@@ -10,7 +10,7 @@ from typing import Optional
+ from fastapi import FastAPI, HTTPException
+ from pydantic import BaseModel
+ 
+-from berichtsheft import db, orchestrator
++from berichtsheft import catalog, db, orchestrator
+ from berichtsheft.ai_gemini import is_enabled as gemini_enabled
+ from berichtsheft.ai_vision import analyze_image, is_vision_enabled
+ from berichtsheft.blok_gaps import format_telegram_report, scan_weeks
+@@ -83,6 +83,30 @@ def health():
+     }
+ 
+ 
++@app.get("/catalog")
++def get_catalog(abteilung: Optional[str] = None, code: Optional[str] = None):
++    """Katalog kegiatan per Abteilung (dari data/katalog_abteilung.json)."""
++    data = catalog.load_katalog()
++    if code:
++        for item in catalog.iter_codes(data):
++            aliases = item.get("aliases") or []
++            if item["code"] == code or code in aliases:
++                return {"ok": True, "item": item}
++        raise HTTPException(404, f"Code tidak ditemukan: {code}")
++    if abteilung:
++        needle = abteilung.strip().lower()
++        matched = [
++            a
++            for a in data.get("abteilungen", [])
++            if (a.get("blok_name") or "").lower() == needle
++            or needle in (a.get("description_de") or "").lower()
++        ]
++        if not matched:
++            raise HTTPException(404, f"Abteilung tidak ditemukan: {abteilung}")
++        return {"ok": True, "abteilungen": matched}
++    return {"ok": True, "katalog": data}
++
++
+ @app.post("/log")
+ def post_log(body: LogBody):
+     iso = body.date or orchestrator.today_iso()
+diff --git a/berichtsheft/areas.py b/berichtsheft/areas.py
+index d893a68..081eb3d 100644
+--- a/berichtsheft/areas.py
++++ b/berichtsheft/areas.py
+@@ -1,4 +1,4 @@
+-"""Load work area map from JSON."""
++"""Load work area map from katalog (preferred) or legacy JSON."""
+ 
+ from __future__ import annotations
+ 
+@@ -6,12 +6,15 @@ import json
+ import sqlite3
+ from pathlib import Path
+ 
+-from berichtsheft import db
++from berichtsheft import catalog, db
+ 
+ ROOT = Path(__file__).resolve().parent.parent
+ 
+ 
+ def load_areas_file(conn: sqlite3.Connection, path: Path | None = None) -> int:
++    if path is None and catalog.KATALOG_PATH.is_file():
++        return catalog.sync_to_db(conn)["areas"]
++
+     path = path or ROOT / "data" / "areas_hotel.json"
+     data = json.loads(path.read_text(encoding="utf-8"))
+     count = 0
+diff --git a/berichtsheft/catalog.py b/berichtsheft/catalog.py
+new file mode 100644
+index 0000000..97ca3cb
+--- /dev/null
++++ b/berichtsheft/catalog.py
+@@ -0,0 +1,261 @@
++"""Katalog kegiatan per Abteilung — load, tampil, sync ke SQLite & file sample."""
++
++from __future__ import annotations
++
++import json
++import sqlite3
++from pathlib import Path
++from typing import Any
++
++from berichtsheft import db
++
++ROOT = Path(__file__).resolve().parent.parent
++KATALOG_PATH = ROOT / "data" / "katalog_abteilung.json"
++AREAS_PATH = ROOT / "data" / "areas_hotel.json"
++TEMPLATES_PATH = ROOT / "data" / "templates_hotelfach.json"
++MAPPING_PATH = ROOT / "data" / "blok_mapping.yaml"
++DOCS_PATH = ROOT / "docs" / "KATALOG_KEGIATAN.md"
++
++
++def load_katalog(path: Path | None = None) -> dict[str, Any]:
++    path = path or KATALOG_PATH
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def iter_codes(katalog: dict[str, Any] | None = None) -> list[dict[str, Any]]:
++    """Flat list of code entries with parent abteilung metadata."""
++    katalog = katalog or load_katalog()
++    rows: list[dict[str, Any]] = []
++    for abt in katalog.get("abteilungen", []):
++        blok_name = abt.get("blok_name") or ""
++        skip = bool(abt.get("skip_blok"))
++        for code_item in abt.get("codes", []):
++            rows.append(
++                {
++                    "blok_name": blok_name,
++                    "skip_blok": skip,
++                    "description_de": abt.get("description_de"),
++                    **code_item,
++                }
++            )
++    return rows
++
++
++def sync_to_db(conn: sqlite3.Connection, katalog: dict[str, Any] | None = None) -> dict[str, int]:
++    """Load katalog into activity_templates + work_areas."""
++    katalog = katalog or load_katalog()
++    db.init_schema(conn)
++    conn.execute("DELETE FROM activity_templates")
++    conn.execute("DELETE FROM work_areas")
++
++    templates = 0
++    areas = 0
++    for item in iter_codes(katalog):
++        code = item["code"]
++        department = item.get("department")
++        lernfeld = item.get("lernfeld")
++        for text in item.get("templates_de") or []:
++            db.upsert_template(conn, code, department, lernfeld, text)
++            templates += 1
++        # aliases share the same template texts for generator lookups
++        for alias in item.get("aliases") or []:
++            for text in item.get("templates_de") or []:
++                db.upsert_template(conn, alias, department, lernfeld, text)
++                templates += 1
++
++        db.upsert_area(
++            conn,
++            code,
++            item.get("name_de", code),
++            item.get("keywords") or [],
++            item.get("default_activities_de") or [],
++        )
++        areas += 1
++        for alias in item.get("aliases") or []:
++            db.upsert_area(
++                conn,
++                alias,
++                item.get("name_de", alias),
++                item.get("keywords") or [],
++                item.get("default_activities_de") or [],
++            )
++            areas += 1
++
++    conn.commit()
++    return {"templates": templates, "areas": areas}
++
++
++def export_legacy_files(katalog: dict[str, Any] | None = None) -> None:
++    """Keep areas_hotel.json + templates_hotelfach.json in sync for older docs."""
++    katalog = katalog or load_katalog()
++    areas_out: list[dict[str, Any]] = []
++    templates_out: list[dict[str, Any]] = []
++
++    for item in iter_codes(katalog):
++        areas_out.append(
++            {
++                "code": item["code"],
++                "name_de": item.get("name_de", item["code"]),
++                "keywords": item.get("keywords") or [],
++                "default_activities_de": item.get("default_activities_de") or [],
++            }
++        )
++        templates_out.append(
++            {
++                "code": item["code"],
++                "department": item.get("department"),
++                "lernfeld": item.get("lernfeld"),
++                "texts": item.get("templates_de") or [],
++            }
++        )
++
++    AREAS_PATH.write_text(
++        json.dumps({"areas": areas_out}, ensure_ascii=False, indent=2) + "\n",
++        encoding="utf-8",
++    )
++    TEMPLATES_PATH.write_text(
++        json.dumps({"templates": templates_out}, ensure_ascii=False, indent=2) + "\n",
++        encoding="utf-8",
++    )
++
++
++def format_catalog_text(katalog: dict[str, Any] | None = None) -> str:
++    katalog = katalog or load_katalog()
++    lines: list[str] = [
++        "Katalog kegiatan per Abteilung",
++        "=" * 40,
++        katalog.get("note", ""),
++        "",
++    ]
++    for abt in katalog.get("abteilungen", []):
++        blok = abt.get("blok_name") or "(tanpa Abteilung / skip BLok)"
++        lines.append(f"## Abteilung BLok: {blok}")
++        if abt.get("description_de"):
++            lines.append(f"   {abt['description_de']}")
++        if abt.get("skip_blok"):
++            lines.append("   ⚠ skip_blok = true")
++        lines.append("")
++        for item in abt.get("codes", []):
++            aliases = item.get("aliases") or []
++            alias_s = f" (alias: {', '.join(aliases)})" if aliases else ""
++            lines.append(f"  • Code: {item['code']}{alias_s}")
++            lines.append(f"    Nama: {item.get('name_de', '')}")
++            lines.append(f"    Department: {item.get('department', '')}")
++            lines.append(f"    Lernfeld: {item.get('lernfeld') or '-'}")
++            kw = ", ".join(item.get("keywords") or [])
++            lines.append(f"    Keywords: {kw or '-'}")
++            defaults = item.get("default_activities_de") or []
++            if defaults:
++                lines.append("    Default:")
++                for d in defaults:
++                    lines.append(f"      - {d}")
++            texts = item.get("templates_de") or []
++            lines.append(f"    Templates ({len(texts)}):")
++            for i, t in enumerate(texts, 1):
++                lines.append(f"      {i}. {t}")
++            lines.append("")
++    return "\n".join(lines).rstrip() + "\n"
++
++
++def format_catalog_markdown(katalog: dict[str, Any] | None = None) -> str:
++    katalog = katalog or load_katalog()
++    lines: list[str] = [
++        "# Katalog kegiatan per Abteilung",
++        "",
++        "> File sumber (edit di sini): [`data/katalog_abteilung.json`](../data/katalog_abteilung.json)",
++        "",
++        katalog.get("note", ""),
++        "",
++        "Setelah edit JSON:",
++        "",
++        "```bash",
++        "python3 -m berichtsheft catalog --reload",
++        "python3 -m berichtsheft catalog --write-md   # regenerasi file ini",
++        "```",
++        "",
++    ]
++    for abt in katalog.get("abteilungen", []):
++        blok = abt.get("blok_name") or "(tanpa Abteilung / skip BLok)"
++        lines.append(f"## {blok or 'Frei / skip'}")
++        lines.append("")
++        if abt.get("description_de"):
++            lines.append(abt["description_de"])
++            lines.append("")
++        if abt.get("skip_blok"):
++            lines.append("**Tidak diisi ke BLok.**")
++            lines.append("")
++        for item in abt.get("codes", []):
++            aliases = item.get("aliases") or []
++            alias_s = f" · alias: `{', '.join(aliases)}`" if aliases else ""
++            lines.append(f"### `{item['code']}` — {item.get('name_de', '')}{alias_s}")
++            lines.append("")
++            lines.append("| Field | Nilai |")
++            lines.append("|-------|-------|")
++            lines.append(f"| Department | {item.get('department') or '-'} |")
++            lines.append(f"| Lernfeld | {item.get('lernfeld') or '-'} |")
++            lines.append(f"| Keywords | {', '.join(item.get('keywords') or []) or '-'} |")
++            lines.append("")
++            lines.append("**Default activities**")
++            lines.append("")
++            for d in item.get("default_activities_de") or []:
++                lines.append(f"- {d}")
++            lines.append("")
++            lines.append("**Template teks Jerman (pool generator)**")
++            lines.append("")
++            for t in item.get("templates_de") or []:
++                lines.append(f"- {t}")
++            lines.append("")
++    return "\n".join(lines)
++
++
++def write_docs_markdown(katalog: dict[str, Any] | None = None) -> Path:
++    text = format_catalog_markdown(katalog)
++    DOCS_PATH.write_text(text, encoding="utf-8")
++    return DOCS_PATH
++
++
++def list_from_db(conn: sqlite3.Connection) -> str:
++    """Tampilkan isi SQLite yang sedang ter-load (untuk pantau runtime)."""
++    db.init_schema(conn)
++    areas = list(conn.execute("SELECT * FROM work_areas ORDER BY code"))
++    templates = list(
++        conn.execute(
++            "SELECT code, department, lernfeld, COUNT(*) AS n "
++            "FROM activity_templates GROUP BY code, department, lernfeld "
++            "ORDER BY department, code"
++        )
++    )
++    lines = [
++        "Database runtime (SQLite)",
++        "=" * 40,
++        f"Path: {db.DEFAULT_DB}",
++        "",
++        f"work_areas ({len(areas)}):",
++    ]
++    for a in areas:
++        kw = json.loads(a["keywords_json"] or "[]")
++        acts = json.loads(a["default_activities_json"] or "[]")
++        lines.append(f"  • {a['code']} — {a['name_de']}")
++        lines.append(f"    keywords: {', '.join(kw)}")
++        lines.append(f"    default: {'; '.join(acts)}")
++    lines.append("")
++    lines.append(f"activity_templates (grouped, {len(templates)} codes):")
++    for t in templates:
++        lines.append(
++            f"  • {t['code']} | {t['department'] or '-'} | "
++            f"{t['lernfeld'] or '-'} | {t['n']} teks"
++        )
++    # detail teks
++    lines.append("")
++    lines.append("Detail teks per code:")
++    for code_row in conn.execute(
++        "SELECT DISTINCT code FROM activity_templates ORDER BY code"
++    ):
++        code = code_row["code"]
++        lines.append(f"  [{code}]")
++        for row in conn.execute(
++            "SELECT text_de FROM activity_templates WHERE code = ? ORDER BY id",
++            (code,),
++        ):
++            lines.append(f"    - {row['text_de']}")
++    return "\n".join(lines).rstrip() + "\n"
+diff --git a/berichtsheft/cli.py b/berichtsheft/cli.py
+index 93c7225..75fdce2 100644
+--- a/berichtsheft/cli.py
++++ b/berichtsheft/cli.py
+@@ -9,7 +9,7 @@ import os
+ import sys
+ from pathlib import Path
+ 
+-from berichtsheft import credentials, db, generator, orchestrator
++from berichtsheft import catalog, credentials, db, generator, orchestrator
+ from berichtsheft.areas import load_areas_file
+ from berichtsheft.blok_worker import run_worker
+ from berichtsheft.seed import bootstrap, load_shifts
+@@ -50,6 +50,69 @@ def cmd_areas_load(_: argparse.Namespace) -> int:
+     return 0
+ 
+ 
++def cmd_catalog(args: argparse.Namespace) -> int:
++    """Tampilkan / reload katalog kegiatan per Abteilung."""
++    if args.reload:
++        conn = db.connect()
++        stats = catalog.sync_to_db(conn)
++        catalog.export_legacy_files()
++        conn.close()
++        print(
++            f"✓ Reload DB: {stats['templates']} templates, {stats['areas']} areas"
++        )
++        print(f"✓ Sync file: {catalog.AREAS_PATH.name}, {catalog.TEMPLATES_PATH.name}")
++
++    if args.write_md:
++        path = catalog.write_docs_markdown()
++        print(f"✓ Docs: {path}")
++
++    if args.db:
++        conn = db.connect()
++        print(catalog.list_from_db(conn), end="")
++        conn.close()
++        return 0
++
++    if args.json:
++        print(json.dumps(catalog.load_katalog(), ensure_ascii=False, indent=2))
++        return 0
++
++    if args.code:
++        found = None
++        for item in catalog.iter_codes():
++            aliases = item.get("aliases") or []
++            if item["code"] == args.code or args.code in aliases:
++                found = item
++                break
++        if not found:
++            print(f"Code tidak ditemukan: {args.code}", file=sys.stderr)
++            return 1
++        print(json.dumps(found, ensure_ascii=False, indent=2))
++        return 0
++
++    if args.abteilung is not None:
++        katalog = catalog.load_katalog()
++        needle = args.abteilung.strip().lower()
++        matched = [
++            a
++            for a in katalog.get("abteilungen", [])
++            if (a.get("blok_name") or "").lower() == needle
++            or needle in (a.get("description_de") or "").lower()
++        ]
++        if not matched:
++            print(f"Abteilung tidak ditemukan: {args.abteilung}", file=sys.stderr)
++            print("Pilihan:", ", ".join(
++                (a.get("blok_name") or "Frei") for a in katalog.get("abteilungen", [])
++            ))
++            return 1
++        print(catalog.format_catalog_text({"abteilungen": matched, "note": katalog.get("note", "")}), end="")
++        return 0
++
++    # default: tampilkan katalog file sumber
++    if not args.reload and not args.write_md:
++        print(catalog.format_catalog_text(), end="")
++    return 0
++
++
+ def cmd_generate(args: argparse.Namespace) -> int:
+     conn = db.connect()
+     if args.week:
+@@ -347,6 +410,33 @@ def main() -> int:
+ 
+     sub.add_parser("areas", help="load areas").set_defaults(func=cmd_areas_load)
+ 
++    p_cat = sub.add_parser(
++        "catalog",
++        help="tampilkan/edit katalog kegiatan per Abteilung",
++    )
++    p_cat.add_argument(
++        "--reload",
++        action="store_true",
++        help="muat ulang data/katalog_abteilung.json ke SQLite + sync file legacy",
++    )
++    p_cat.add_argument(
++        "--write-md",
++        action="store_true",
++        help="tulis ulang docs/KATALOG_KEGIATAN.md dari JSON",
++    )
++    p_cat.add_argument(
++        "--db",
++        action="store_true",
++        help="tampilkan isi SQLite runtime (bukan file JSON)",
++    )
++    p_cat.add_argument("--json", action="store_true", help="dump JSON mentah")
++    p_cat.add_argument("--code", help="tampilkan satu code (mis. BRF, HK)")
++    p_cat.add_argument(
++        "--abteilung",
++        help="filter Abteilung BLok (mis. Service, Housekeeping, Tagungen)",
++    )
++    p_cat.set_defaults(func=cmd_catalog)
++
+     p_gen = sub.add_parser("generate")
+     p_gen.add_argument("--week")
+     p_gen.add_argument("--from", dest="from_date")
+diff --git a/berichtsheft/seed.py b/berichtsheft/seed.py
+index 065520a..7abc17e 100644
+--- a/berichtsheft/seed.py
++++ b/berichtsheft/seed.py
+@@ -1,4 +1,4 @@
+-"""Load templates and shift JSON into SQLite."""
++"""Load templates, areas, and shift JSON into SQLite."""
+ 
+ from __future__ import annotations
+ 
+@@ -6,12 +6,17 @@ import json
+ import sqlite3
+ from pathlib import Path
+ 
+-from berichtsheft import db
++from berichtsheft import catalog, db
+ 
+ ROOT = Path(__file__).resolve().parent.parent
+ 
+ 
+ def load_templates(conn: sqlite3.Connection, path: Path | None = None) -> int:
++    """Load templates from katalog (preferred) or legacy templates JSON."""
++    if path is None and catalog.KATALOG_PATH.is_file():
++        result = catalog.sync_to_db(conn)
++        return result["templates"]
++
+     path = path or ROOT / "data" / "templates_hotelfach.json"
+     data = json.loads(path.read_text(encoding="utf-8"))
+     conn.execute("DELETE FROM activity_templates")
+@@ -53,8 +58,13 @@ def load_shifts(conn: sqlite3.Connection, path: Path) -> int:
+ 
+ def bootstrap(conn: sqlite3.Connection) -> None:
+     db.init_schema(conn)
+-    templates = load_templates(conn)
++    if catalog.KATALOG_PATH.is_file():
++        stats = catalog.sync_to_db(conn)
++        catalog.export_legacy_files()
++        print(f"✓ {stats['templates']} Vorlagen + {stats['areas']} areas dari katalog")
++    else:
++        templates = load_templates(conn)
++        print(f"✓ {templates} Vorlagen geladen")
+     shifts_path = ROOT / "data" / "shifts_kw23_24.json"
+     shifts = load_shifts(conn, shifts_path)
+-    print(f"✓ {templates} Vorlagen geladen")
+     print(f"✓ {shifts} Schichten aus {shifts_path.name}")
+diff --git a/data/areas_hotel.json b/data/areas_hotel.json
+index bd61c41..74e306f 100644
+--- a/data/areas_hotel.json
++++ b/data/areas_hotel.json
+@@ -3,34 +3,112 @@
+     {
+       "code": "BRF",
+       "name_de": "Frühstück / Restaurant",
+-      "keywords": ["buffet", "frühstück", "breakfast", "gäste begrüßen"],
++      "keywords": [
++        "buffet",
++        "frühstück",
++        "breakfast",
++        "gäste begrüßen",
++        "brf",
++        "getränke"
++      ],
+       "default_activities_de": [
+         "Frühstücksservice und Buffetbetreuung"
+       ]
+     },
++    {
++      "code": "BAF",
++      "name_de": "BAF / Servicebereich",
++      "keywords": [
++        "baf",
++        "service",
++        "restaurant",
++        "gästebetreuung"
++      ],
++      "default_activities_de": [
++        "Service und Vorbereitung im BAF-Bereich"
++      ]
++    },
+     {
+       "code": "Housekeeping",
+       "name_de": "Housekeeping",
+-      "keywords": ["zimmer", "housekeeping", "bett", "reinigung"],
++      "keywords": [
++        "zimmer",
++        "housekeeping",
++        "hk",
++        "bett",
++        "reinigung",
++        "wäsche"
++      ],
+       "default_activities_de": [
+-        "Zimmerreinigung nach Standard"
++        "Zimmerreinigung nach Hotelstandard"
+       ]
+     },
+     {
+       "code": "Tagungen",
+-      "name_de": "Tagung / MEP",
+-      "keywords": ["tagung", "coffee", "konferenz", "mep", "pausen"],
++      "name_de": "Tagungsbetreuung",
++      "keywords": [
++        "tagung",
++        "coffee",
++        "konferenz",
++        "mep",
++        "pausen",
++        "coffee-break"
++      ],
+       "default_activities_de": [
+         "Tagungsbetreuung und Pausenversorgung"
+       ]
+     },
++    {
++      "code": "BRE+TG MEP",
++      "name_de": "Frühstück & Tagungsvorbereitung MEP",
++      "keywords": [
++        "bre",
++        "mep",
++        "tagungsvorbereitung",
++        "frühstück",
++        "bestuhlung"
++      ],
++      "default_activities_de": [
++        "Vorbereitung Frühstück und Tagungsräume (MEP)"
++      ]
++    },
++    {
++      "code": "FS2",
++      "name_de": "Frühschicht Frühstück & Tagung",
++      "keywords": [
++        "fs2",
++        "frühschicht",
++        "tagung",
++        "frühstück"
++      ],
++      "default_activities_de": [
++        "Frühschicht im Bereich Frühstück und Tagung"
++      ]
++    },
+     {
+       "code": "Schule",
+       "name_de": "Berufsschule",
+-      "keywords": ["schule", "unterricht"],
++      "keywords": [
++        "schule",
++        "unterricht",
++        "berufsschule",
++        "klassenarbeit"
++      ],
+       "default_activities_de": [
+         "Berufsschulunterricht"
+       ]
++    },
++    {
++      "code": "frei",
++      "name_de": "Frei / Ausgang",
++      "keywords": [
++        "frei",
++        "ausgang",
++        "libur"
++      ],
++      "default_activities_de": [
++        "Frei / Ausgang laut Dienstplan"
++      ]
+     }
+   ]
+ }
+diff --git a/data/blok_mapping.yaml b/data/blok_mapping.yaml
+index 29370a3..7fb8956 100644
+--- a/data/blok_mapping.yaml
++++ b/data/blok_mapping.yaml
+@@ -1,4 +1,5 @@
+ # EdTime / kode kerja → field BLok (sesuaikan nama persis seperti di dropdown BLok)
++# Katalog lengkap kegiatan: data/katalog_abteilung.json
+ 
+ presence:
+   arbeit: Anwesend
+@@ -12,6 +13,7 @@ location:
+ # Weekend kerja: ubah Wochenende → Anwesend agar textarea muncul
+ weekend_arbeit_presence: Anwesend
+ 
++# Nilai harus cocok dengan dropdown Abteilung di BLok
+ abteilung:
+   default: ""
+   BRF: Service
+@@ -19,4 +21,8 @@ abteilung:
+   HK: Housekeeping
+   Housekeeping: Housekeeping
+   Tagungen: Tagungen
++  "BRE+TG MEP": Tagungen
++  FS2: Tagungen
+   Schule: Berufsschule
++  frei: ""
++  Ausgang: ""
+diff --git a/data/katalog_abteilung.json b/data/katalog_abteilung.json
+new file mode 100644
+index 0000000..281e8a2
+--- /dev/null
++++ b/data/katalog_abteilung.json
+@@ -0,0 +1,205 @@
++{
++  "version": 1,
++  "note": "Sumber kebenaran kegiatan per Abteilung. Edit di sini → jalankan: python3 -m berichtsheft catalog --reload",
++  "abteilungen": [
++    {
++      "blok_name": "Service",
++      "description_de": "Service / F&B (Frühstück, Restaurant, BAF)",
++      "codes": [
++        {
++          "code": "BRF",
++          "name_de": "Frühstück / Restaurant",
++          "department": "F&B",
++          "lernfeld": "Gästeservice und Kommunikation",
++          "keywords": [
++            "buffet",
++            "frühstück",
++            "breakfast",
++            "gäste begrüßen",
++            "brf",
++            "getränke"
++          ],
++          "default_activities_de": [
++            "Frühstücksservice und Buffetbetreuung"
++          ],
++          "templates_de": [
++            "Unterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.",
++            "Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
++            "Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.",
++            "Kontrolle der Buffetqualität (Frische, Vollständigkeit) und Nachfüllen der Stationen während des Betriebs."
++          ]
++        },
++        {
++          "code": "BAF",
++          "name_de": "BAF / Servicebereich",
++          "department": "F&B",
++          "lernfeld": "Gästeservice und Kommunikation",
++          "keywords": [
++            "baf",
++            "service",
++            "restaurant",
++            "gästebetreuung"
++          ],
++          "default_activities_de": [
++            "Service und Vorbereitung im BAF-Bereich"
++          ],
++          "templates_de": [
++            "Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.",
++            "Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.",
++            "Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende."
++          ]
++        }
++      ]
++    },
++    {
++      "blok_name": "Housekeeping",
++      "description_de": "Housekeeping / Zimmerreinigung",
++      "codes": [
++        {
++          "code": "Housekeeping",
++          "aliases": ["HK"],
++          "name_de": "Housekeeping",
++          "department": "Housekeeping",
++          "lernfeld": "Wirtschafts- und Sozialprozesse",
++          "keywords": [
++            "zimmer",
++            "housekeeping",
++            "hk",
++            "bett",
++            "reinigung",
++            "wäsche"
++          ],
++          "default_activities_de": [
++            "Zimmerreinigung nach Hotelstandard"
++          ],
++          "templates_de": [
++            "Zimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.",
++            "Unterstützung bei der Bettenaufbereitung und Nachfüllen der Verbrauchsmaterialien.",
++            "Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption.",
++            "Sortierung und Vorbereitung von Wäsche sowie Unterstützung bei der Etagenorganisation."
++          ]
++        }
++      ]
++    },
++    {
++      "blok_name": "Tagungen",
++      "description_de": "Tagung / Veranstaltung / MEP",
++      "codes": [
++        {
++          "code": "Tagungen",
++          "name_de": "Tagungsbetreuung",
++          "department": "Tagung",
++          "lernfeld": "Veranstaltungen und Tagungsbetreuung",
++          "keywords": [
++            "tagung",
++            "coffee",
++            "konferenz",
++            "mep",
++            "pausen",
++            "coffee-break"
++          ],
++          "default_activities_de": [
++            "Tagungsbetreuung und Pausenversorgung"
++          ],
++          "templates_de": [
++            "Betreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.",
++            "Nachbereitung der Tagungsräume nach Veranstaltungsende.",
++            "Unterstützung bei Coffee-Breaks und Umräumen der Säle.",
++            "Kontrolle der Tagungsausstattung (Blöcke, Stifte, Wasser) während der Veranstaltung."
++          ]
++        },
++        {
++          "code": "BRE+TG MEP",
++          "name_de": "Frühstück & Tagungsvorbereitung MEP",
++          "department": "Tagung / F&B",
++          "lernfeld": "Veranstaltungen und Tagungsbetreuung",
++          "keywords": [
++            "bre",
++            "mep",
++            "tagungsvorbereitung",
++            "frühstück",
++            "bestuhlung"
++          ],
++          "default_activities_de": [
++            "Vorbereitung Frühstück und Tagungsräume (MEP)"
++          ],
++          "templates_de": [
++            "Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.",
++            "Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.",
++            "Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung."
++          ]
++        },
++        {
++          "code": "FS2",
++          "name_de": "Frühschicht Frühstück & Tagung",
++          "department": "F&B / Tagung",
++          "lernfeld": "Veranstaltungen und Tagungsbetreuung",
++          "keywords": [
++            "fs2",
++            "frühschicht",
++            "tagung",
++            "frühstück"
++          ],
++          "default_activities_de": [
++            "Frühschicht im Bereich Frühstück und Tagung"
++          ],
++          "templates_de": [
++            "Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.",
++            "Unterstützung bei der Übergabe zwischen Frühstücks- und Tagungsteam während der Schicht."
++          ]
++        }
++      ]
++    },
++    {
++      "blok_name": "Berufsschule",
++      "description_de": "Berufsschule / schulischer Lernort",
++      "codes": [
++        {
++          "code": "Schule",
++          "name_de": "Berufsschule",
++          "department": "Berufsschule",
++          "lernfeld": "Lernfeld Berufsschule",
++          "keywords": [
++            "schule",
++            "unterricht",
++            "berufsschule",
++            "klassenarbeit"
++          ],
++          "default_activities_de": [
++            "Berufsschulunterricht"
++          ],
++          "templates_de": [
++            "Unterricht in der Berufsschule: Theorie zu Hotelfachmann/-frau, Rechnungswesen und Fachkunde.",
++            "Bearbeitung von Übungsaufgaben und Vorbereitung auf anstehende Klassenarbeiten.",
++            "Fachpraktische Übungen und Projektarbeit im schulischen Lernfeld."
++          ]
++        }
++      ]
++    },
++    {
++      "blok_name": "",
++      "description_de": "Frei / Ausgang — tidak diisi ke BLok",
++      "skip_blok": true,
++      "codes": [
++        {
++          "code": "frei",
++          "aliases": ["Ausgang"],
++          "name_de": "Frei / Ausgang",
++          "department": "-",
++          "lernfeld": null,
++          "keywords": [
++            "frei",
++            "ausgang",
++            "libur"
++          ],
++          "default_activities_de": [
++            "Frei / Ausgang laut Dienstplan"
++          ],
++          "templates_de": [
++            "Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis."
++          ]
++        }
++      ]
++    }
++  ]
++}
+diff --git a/data/templates_hotelfach.json b/data/templates_hotelfach.json
+index 652a41a..5bb5cb2 100644
+--- a/data/templates_hotelfach.json
++++ b/data/templates_hotelfach.json
+@@ -1,22 +1,24 @@
+ {
+   "templates": [
+     {
+-      "code": "BAF",
++      "code": "BRF",
+       "department": "F&B",
+       "lernfeld": "Gästeservice und Kommunikation",
+       "texts": [
+-        "Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.",
+-        "Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF."
++        "Unterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.",
++        "Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
++        "Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.",
++        "Kontrolle der Buffetqualität (Frische, Vollständigkeit) und Nachfüllen der Stationen während des Betriebs."
+       ]
+     },
+     {
+-      "code": "BRF",
++      "code": "BAF",
+       "department": "F&B",
+       "lernfeld": "Gästeservice und Kommunikation",
+       "texts": [
+-        "Unterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.",
+-        "Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
+-        "Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren."
++        "Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.",
++        "Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.",
++        "Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende."
+       ]
+     },
+     {
+@@ -26,27 +28,29 @@
+       "texts": [
+         "Zimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.",
+         "Unterstützung bei der Bettenaufbereitung und Nachfüllen der Verbrauchsmaterialien.",
+-        "Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption."
++        "Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption.",
++        "Sortierung und Vorbereitung von Wäsche sowie Unterstützung bei der Etagenorganisation."
+       ]
+     },
+     {
+-      "code": "BRE+TG MEP",
+-      "department": "Tagung / F&B",
++      "code": "Tagungen",
++      "department": "Tagung",
+       "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+       "texts": [
+-        "Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.",
+-        "Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.",
+-        "Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung."
++        "Betreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.",
++        "Nachbereitung der Tagungsräume nach Veranstaltungsende.",
++        "Unterstützung bei Coffee-Breaks und Umräumen der Säle.",
++        "Kontrolle der Tagungsausstattung (Blöcke, Stifte, Wasser) während der Veranstaltung."
+       ]
+     },
+     {
+-      "code": "Tagungen",
+-      "department": "Tagung",
++      "code": "BRE+TG MEP",
++      "department": "Tagung / F&B",
+       "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+       "texts": [
+-        "Betreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.",
+-        "Nachbereitung der Tagungsräume nach Veranstaltungsende.",
+-        "Unterstützung bei Coffee-Breaks und Umräumen der Säle."
++        "Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.",
++        "Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.",
++        "Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung."
+       ]
+     },
+     {
+@@ -54,7 +58,8 @@
+       "department": "F&B / Tagung",
+       "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+       "texts": [
+-        "Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan."
++        "Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.",
++        "Unterstützung bei der Übergabe zwischen Frühstücks- und Tagungsteam während der Schicht."
+       ]
+     },
+     {
+@@ -71,7 +76,9 @@
+       "code": "frei",
+       "department": "-",
+       "lernfeld": null,
+-      "texts": ["Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis."]
++      "texts": [
++        "Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis."
++      ]
+     }
+   ]
+ }
+diff --git a/docs/KATALOG_KEGIATAN.md b/docs/KATALOG_KEGIATAN.md
+new file mode 100644
+index 0000000..63c334d
+--- /dev/null
++++ b/docs/KATALOG_KEGIATAN.md
+@@ -0,0 +1,178 @@
++# Katalog kegiatan per Abteilung
++
++> File sumber (edit di sini): [`data/katalog_abteilung.json`](../data/katalog_abteilung.json)
++
++Sumber kebenaran kegiatan per Abteilung. Edit di sini → jalankan: python3 -m berichtsheft catalog --reload
++
++Setelah edit JSON:
++
++```bash
++python3 -m berichtsheft catalog --reload
++python3 -m berichtsheft catalog --write-md   # regenerasi file ini
++```
++
++## Service
++
++Service / F&B (Frühstück, Restaurant, BAF)
++
++### `BRF` — Frühstück / Restaurant
++
++| Field | Nilai |
++|-------|-------|
++| Department | F&B |
++| Lernfeld | Gästeservice und Kommunikation |
++| Keywords | buffet, frühstück, breakfast, gäste begrüßen, brf, getränke |
++
++**Default activities**
++
++- Frühstücksservice und Buffetbetreuung
++
++**Template teks Jerman (pool generator)**
++
++- Unterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.
++- Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.
++- Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.
++- Kontrolle der Buffetqualität (Frische, Vollständigkeit) und Nachfüllen der Stationen während des Betriebs.
++
++### `BAF` — BAF / Servicebereich
++
++| Field | Nilai |
++|-------|-------|
++| Department | F&B |
++| Lernfeld | Gästeservice und Kommunikation |
++| Keywords | baf, service, restaurant, gästebetreuung |
++
++**Default activities**
++
++- Service und Vorbereitung im BAF-Bereich
++
++**Template teks Jerman (pool generator)**
++
++- Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.
++- Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.
++- Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende.
++
++## Housekeeping
++
++Housekeeping / Zimmerreinigung
++
++### `Housekeeping` — Housekeeping · alias: `HK`
++
++| Field | Nilai |
++|-------|-------|
++| Department | Housekeeping |
++| Lernfeld | Wirtschafts- und Sozialprozesse |
++| Keywords | zimmer, housekeeping, hk, bett, reinigung, wäsche |
++
++**Default activities**
++
++- Zimmerreinigung nach Hotelstandard
++
++**Template teks Jerman (pool generator)**
++
++- Zimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.
++- Unterstützung bei der Bettenaufbereitung und Nachfüllen der Verbrauchsmaterialien.
++- Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption.
++- Sortierung und Vorbereitung von Wäsche sowie Unterstützung bei der Etagenorganisation.
++
++## Tagungen
++
++Tagung / Veranstaltung / MEP
++
++### `Tagungen` — Tagungsbetreuung
++
++| Field | Nilai |
++|-------|-------|
++| Department | Tagung |
++| Lernfeld | Veranstaltungen und Tagungsbetreuung |
++| Keywords | tagung, coffee, konferenz, mep, pausen, coffee-break |
++
++**Default activities**
++
++- Tagungsbetreuung und Pausenversorgung
++
++**Template teks Jerman (pool generator)**
++
++- Betreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.
++- Nachbereitung der Tagungsräume nach Veranstaltungsende.
++- Unterstützung bei Coffee-Breaks und Umräumen der Säle.
++- Kontrolle der Tagungsausstattung (Blöcke, Stifte, Wasser) während der Veranstaltung.
++
++### `BRE+TG MEP` — Frühstück & Tagungsvorbereitung MEP
++
++| Field | Nilai |
++|-------|-------|
++| Department | Tagung / F&B |
++| Lernfeld | Veranstaltungen und Tagungsbetreuung |
++| Keywords | bre, mep, tagungsvorbereitung, frühstück, bestuhlung |
++
++**Default activities**
++
++- Vorbereitung Frühstück und Tagungsräume (MEP)
++
++**Template teks Jerman (pool generator)**
++
++- Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.
++- Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.
++- Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung.
++
++### `FS2` — Frühschicht Frühstück & Tagung
++
++| Field | Nilai |
++|-------|-------|
++| Department | F&B / Tagung |
++| Lernfeld | Veranstaltungen und Tagungsbetreuung |
++| Keywords | fs2, frühschicht, tagung, frühstück |
++
++**Default activities**
++
++- Frühschicht im Bereich Frühstück und Tagung
++
++**Template teks Jerman (pool generator)**
++
++- Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.
++- Unterstützung bei der Übergabe zwischen Frühstücks- und Tagungsteam während der Schicht.
++
++## Berufsschule
++
++Berufsschule / schulischer Lernort
++
++### `Schule` — Berufsschule
++
++| Field | Nilai |
++|-------|-------|
++| Department | Berufsschule |
++| Lernfeld | Lernfeld Berufsschule |
++| Keywords | schule, unterricht, berufsschule, klassenarbeit |
++
++**Default activities**
++
++- Berufsschulunterricht
++
++**Template teks Jerman (pool generator)**
++
++- Unterricht in der Berufsschule: Theorie zu Hotelfachmann/-frau, Rechnungswesen und Fachkunde.
++- Bearbeitung von Übungsaufgaben und Vorbereitung auf anstehende Klassenarbeiten.
++- Fachpraktische Übungen und Projektarbeit im schulischen Lernfeld.
++
++## (tanpa Abteilung / skip BLok)
++
++Frei / Ausgang — tidak diisi ke BLok
++
++**Tidak diisi ke BLok.**
++
++### `frei` — Frei / Ausgang · alias: `Ausgang`
++
++| Field | Nilai |
++|-------|-------|
++| Department | - |
++| Lernfeld | - |
++| Keywords | frei, ausgang, libur |
++
++**Default activities**
++
++- Frei / Ausgang laut Dienstplan
++
++**Template teks Jerman (pool generator)**
++
++- Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis.
+diff --git a/docs/PROGRESS.md b/docs/PROGRESS.md
+index b66a99b..53ec40d 100644
+--- a/docs/PROGRESS.md
++++ b/docs/PROGRESS.md
+@@ -22,6 +22,7 @@ Terakhir diperbarui: 5 Juni 2026 — persiapan upload GitHub + dokumentasi lengk
+ | WiFi portal auto | ❌ Opsional | `wifi.*` di `config.yaml` |
+ | Submit otomatis L2 penuh | 🟡 Sebagian | `/ok` isi live; submit minggu manual |
+ | Dokumentasi GitHub | ✅ | README, LANDASAN, TECH_STACK, GITHUB_UPLOAD |
++| Katalog kegiatan per Abteilung | ✅ | `data/katalog_abteilung.json` + CLI `catalog` |
+ 
+ ## Yang sudah berjalan end-to-end
+ 
+diff --git a/tests/test_catalog.py b/tests/test_catalog.py
+new file mode 100644
+index 0000000..3ffc7ad
+--- /dev/null
++++ b/tests/test_catalog.py
+@@ -0,0 +1,63 @@
++"""Tests for katalog kegiatan per Abteilung."""
++
++from __future__ import annotations
++
++import json
++import tempfile
++import unittest
++from pathlib import Path
++
++from berichtsheft import catalog, db
++
++
++class TestCatalog(unittest.TestCase):
++    def test_load_and_iter_codes(self) -> None:
++        data = catalog.load_katalog()
++        codes = catalog.iter_codes(data)
++        code_names = {c["code"] for c in codes}
++        self.assertIn("BRF", code_names)
++        self.assertIn("BAF", code_names)
++        self.assertIn("Housekeeping", code_names)
++        self.assertIn("Tagungen", code_names)
++        self.assertIn("BRE+TG MEP", code_names)
++        self.assertIn("FS2", code_names)
++        self.assertIn("Schule", code_names)
++        self.assertIn("frei", code_names)
++
++    def test_brf_is_service(self) -> None:
++        brf = next(c for c in catalog.iter_codes() if c["code"] == "BRF")
++        self.assertEqual(brf["blok_name"], "Service")
++        self.assertGreaterEqual(len(brf["templates_de"]), 3)
++
++    def test_sync_to_db(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            path = Path(tmp) / "test.db"
++            conn = db.connect(path)
++            stats = catalog.sync_to_db(conn)
++            self.assertGreater(stats["templates"], 10)
++            self.assertGreaterEqual(stats["areas"], 8)
++
++            rows = conn.execute(
++                "SELECT COUNT(*) AS n FROM activity_templates WHERE code = ?",
++                ("BRF",),
++            ).fetchone()
++            self.assertGreaterEqual(rows["n"], 3)
++
++            hk = conn.execute(
++                "SELECT * FROM work_areas WHERE code = ?", ("HK",)
++            ).fetchone()
++            self.assertIsNotNone(hk)
++            keywords = json.loads(hk["keywords_json"])
++            self.assertIn("housekeeping", keywords)
++            conn.close()
++
++    def test_format_text_contains_abteilung(self) -> None:
++        text = catalog.format_catalog_text()
++        self.assertIn("Service", text)
++        self.assertIn("Housekeeping", text)
++        self.assertIn("Tagungen", text)
++        self.assertIn("BRF", text)
++
++
++if __name__ == "__main__":
++    unittest.main()
+-- 
+2.43.0
+

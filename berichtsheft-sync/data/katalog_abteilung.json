@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "note": "Sumber kebenaran kegiatan per Abteilung. Edit di sini → jalankan: python3 -m berichtsheft catalog --reload",
+  "abteilungen": [
+    {
+      "blok_name": "Service",
+      "description_de": "Service / F&B (Frühstück, Restaurant, BAF)",
+      "codes": [
+        {
+          "code": "BRF",
+          "name_de": "Frühstück / Restaurant",
+          "department": "F&B",
+          "lernfeld": "Gästeservice und Kommunikation",
+          "keywords": [
+            "buffet",
+            "frühstück",
+            "breakfast",
+            "gäste begrüßen",
+            "brf",
+            "getränke"
+          ],
+          "default_activities_de": [
+            "Frühstücksservice und Buffetbetreuung"
+          ],
+          "templates_de": [
+            "Unterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.",
+            "Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
+            "Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.",
+            "Kontrolle der Buffetqualität (Frische, Vollständigkeit) und Nachfüllen der Stationen während des Betriebs."
+          ]
+        },
+        {
+          "code": "BAF",
+          "name_de": "BAF / Servicebereich",
+          "department": "F&B",
+          "lernfeld": "Gästeservice und Kommunikation",
+          "keywords": [
+            "baf",
+            "service",
+            "restaurant",
+            "gästebetreuung"
+          ],
+          "default_activities_de": [
+            "Service und Vorbereitung im BAF-Bereich"
+          ],
+          "templates_de": [
+            "Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.",
+            "Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.",
+            "Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende."
+          ]
+        }
+      ]
+    },
+    {
+      "blok_name": "Housekeeping",
+      "description_de": "Housekeeping / Zimmerreinigung",
+      "codes": [
+        {
+          "code": "Housekeeping",
+          "aliases": ["HK"],
+          "name_de": "Housekeeping",
+          "department": "Housekeeping",
+          "lernfeld": "Wirtschafts- und Sozialprozesse",
+          "keywords": [
+            "zimmer",
+            "housekeeping",
+            "hk",
+            "bett",
+            "reinigung",
+            "wäsche"
+          ],
+          "default_activities_de": [
+            "Zimmerreinigung nach Hotelstandard"
+          ],
+          "templates_de": [
+            "Zimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.",
+            "Unterstützung bei der Bettenaufbereitung und Nachfüllen der Verbrauchsmaterialien.",
+            "Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption.",
+            "Sortierung und Vorbereitung von Wäsche sowie Unterstützung bei der Etagenorganisation."
+          ]
+        }
+      ]
+    },
+    {
+      "blok_name": "Tagungen",
+      "description_de": "Tagung / Veranstaltung / MEP",
+      "codes": [
+        {
+          "code": "Tagungen",
+          "name_de": "Tagungsbetreuung",
+          "department": "Tagung",
+          "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+          "keywords": [
+            "tagung",
+            "coffee",
+            "konferenz",
+            "mep",
+            "pausen",
+            "coffee-break"
+          ],
+          "default_activities_de": [
+            "Tagungsbetreuung und Pausenversorgung"
+          ],
+          "templates_de": [
+            "Betreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.",
+            "Nachbereitung der Tagungsräume nach Veranstaltungsende.",
+            "Unterstützung bei Coffee-Breaks und Umräumen der Säle.",
+            "Kontrolle der Tagungsausstattung (Blöcke, Stifte, Wasser) während der Veranstaltung."
+          ]
+        },
+        {
+          "code": "BRE+TG MEP",
+          "name_de": "Frühstück & Tagungsvorbereitung MEP",
+          "department": "Tagung / F&B",
+          "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+          "keywords": [
+            "bre",
+            "mep",
+            "tagungsvorbereitung",
+            "frühstück",
+            "bestuhlung"
+          ],
+          "default_activities_de": [
+            "Vorbereitung Frühstück und Tagungsräume (MEP)"
+          ],
+          "templates_de": [
+            "Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.",
+            "Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.",
+            "Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung."
+          ]
+        },
+        {
+          "code": "FS2",
+          "name_de": "Frühschicht Frühstück & Tagung",
+          "department": "F&B / Tagung",
+          "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+          "keywords": [
+            "fs2",
+            "frühschicht",
+            "tagung",
+            "frühstück"
+          ],
+          "default_activities_de": [
+            "Frühschicht im Bereich Frühstück und Tagung"
+          ],
+          "templates_de": [
+            "Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.",
+            "Unterstützung bei der Übergabe zwischen Frühstücks- und Tagungsteam während der Schicht."
+          ]
+        }
+      ]
+    },
+    {
+      "blok_name": "Berufsschule",
+      "description_de": "Berufsschule / schulischer Lernort",
+      "codes": [
+        {
+          "code": "Schule",
+          "name_de": "Berufsschule",
+          "department": "Berufsschule",
+          "lernfeld": "Lernfeld Berufsschule",
+          "keywords": [
+            "schule",
+            "unterricht",
+            "berufsschule",
+            "klassenarbeit"
+          ],
+          "default_activities_de": [
+            "Berufsschulunterricht"
+          ],
+          "templates_de": [
+            "Unterricht in der Berufsschule: Theorie zu Hotelfachmann/-frau, Rechnungswesen und Fachkunde.",
+            "Bearbeitung von Übungsaufgaben und Vorbereitung auf anstehende Klassenarbeiten.",
+            "Fachpraktische Übungen und Projektarbeit im schulischen Lernfeld."
+          ]
+        }
+      ]
+    },
+    {
+      "blok_name": "",
+      "description_de": "Frei / Ausgang — tidak diisi ke BLok",
+      "skip_blok": true,
+      "codes": [
+        {
+          "code": "frei",
+          "aliases": ["Ausgang"],
+          "name_de": "Frei / Ausgang",
+          "department": "-",
+          "lernfeld": null,
+          "keywords": [
+            "frei",
+            "ausgang",
+            "libur"
+          ],
+          "default_activities_de": [
+            "Frei / Ausgang laut Dienstplan"
+          ],
+          "templates_de": [
+            "Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis."
+          ]
+        }
+      ]
+    }
+  ]
+}

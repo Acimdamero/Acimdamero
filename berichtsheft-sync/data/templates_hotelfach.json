@@ -1,0 +1,84 @@
+{
+  "templates": [
+    {
+      "code": "BRF",
+      "department": "F&B",
+      "lernfeld": "Gästeservice und Kommunikation",
+      "texts": [
+        "Unterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.",
+        "Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
+        "Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.",
+        "Kontrolle der Buffetqualität (Frische, Vollständigkeit) und Nachfüllen der Stationen während des Betriebs."
+      ]
+    },
+    {
+      "code": "BAF",
+      "department": "F&B",
+      "lernfeld": "Gästeservice und Kommunikation",
+      "texts": [
+        "Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.",
+        "Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.",
+        "Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende."
+      ]
+    },
+    {
+      "code": "Housekeeping",
+      "department": "Housekeeping",
+      "lernfeld": "Wirtschafts- und Sozialprozesse",
+      "texts": [
+        "Zimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.",
+        "Unterstützung bei der Bettenaufbereitung und Nachfüllen der Verbrauchsmaterialien.",
+        "Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption.",
+        "Sortierung und Vorbereitung von Wäsche sowie Unterstützung bei der Etagenorganisation."
+      ]
+    },
+    {
+      "code": "Tagungen",
+      "department": "Tagung",
+      "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+      "texts": [
+        "Betreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.",
+        "Nachbereitung der Tagungsräume nach Veranstaltungsende.",
+        "Unterstützung bei Coffee-Breaks und Umräumen der Säle.",
+        "Kontrolle der Tagungsausstattung (Blöcke, Stifte, Wasser) während der Veranstaltung."
+      ]
+    },
+    {
+      "code": "BRE+TG MEP",
+      "department": "Tagung / F&B",
+      "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+      "texts": [
+        "Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.",
+        "Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.",
+        "Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung."
+      ]
+    },
+    {
+      "code": "FS2",
+      "department": "F&B / Tagung",
+      "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+      "texts": [
+        "Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.",
+        "Unterstützung bei der Übergabe zwischen Frühstücks- und Tagungsteam während der Schicht."
+      ]
+    },
+    {
+      "code": "Schule",
+      "department": "Berufsschule",
+      "lernfeld": "Lernfeld Berufsschule",
+      "texts": [
+        "Unterricht in der Berufsschule: Theorie zu Hotelfachmann/-frau, Rechnungswesen und Fachkunde.",
+        "Bearbeitung von Übungsaufgaben und Vorbereitung auf anstehende Klassenarbeiten.",
+        "Fachpraktische Übungen und Projektarbeit im schulischen Lernfeld."
+      ]
+    },
+    {
+      "code": "frei",
+      "department": "-",
+      "lernfeld": null,
+      "texts": [
+        "Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis."
+      ]
+    }
+  ]
+}
