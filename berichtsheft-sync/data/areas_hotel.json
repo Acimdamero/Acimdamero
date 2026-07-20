@@ -1,0 +1,114 @@
+{
+  "areas": [
+    {
+      "code": "BRF",
+      "name_de": "Frühstück / Restaurant",
+      "keywords": [
+        "buffet",
+        "frühstück",
+        "breakfast",
+        "gäste begrüßen",
+        "brf",
+        "getränke"
+      ],
+      "default_activities_de": [
+        "Frühstücksservice und Buffetbetreuung"
+      ]
+    },
+    {
+      "code": "BAF",
+      "name_de": "BAF / Servicebereich",
+      "keywords": [
+        "baf",
+        "service",
+        "restaurant",
+        "gästebetreuung"
+      ],
+      "default_activities_de": [
+        "Service und Vorbereitung im BAF-Bereich"
+      ]
+    },
+    {
+      "code": "Housekeeping",
+      "name_de": "Housekeeping",
+      "keywords": [
+        "zimmer",
+        "housekeeping",
+        "hk",
+        "bett",
+        "reinigung",
+        "wäsche"
+      ],
+      "default_activities_de": [
+        "Zimmerreinigung nach Hotelstandard"
+      ]
+    },
+    {
+      "code": "Tagungen",
+      "name_de": "Tagungsbetreuung",
+      "keywords": [
+        "tagung",
+        "coffee",
+        "konferenz",
+        "mep",
+        "pausen",
+        "coffee-break"
+      ],
+      "default_activities_de": [
+        "Tagungsbetreuung und Pausenversorgung"
+      ]
+    },
+    {
+      "code": "BRE+TG MEP",
+      "name_de": "Frühstück & Tagungsvorbereitung MEP",
+      "keywords": [
+        "bre",
+        "mep",
+        "tagungsvorbereitung",
+        "frühstück",
+        "bestuhlung"
+      ],
+      "default_activities_de": [
+        "Vorbereitung Frühstück und Tagungsräume (MEP)"
+      ]
+    },
+    {
+      "code": "FS2",
+      "name_de": "Frühschicht Frühstück & Tagung",
+      "keywords": [
+        "fs2",
+        "frühschicht",
+        "tagung",
+        "frühstück"
+      ],
+      "default_activities_de": [
+        "Frühschicht im Bereich Frühstück und Tagung"
+      ]
+    },
+    {
+      "code": "Schule",
+      "name_de": "Berufsschule",
+      "keywords": [
+        "schule",
+        "unterricht",
+        "berufsschule",
+        "klassenarbeit"
+      ],
+      "default_activities_de": [
+        "Berufsschulunterricht"
+      ]
+    },
+    {
+      "code": "frei",
+      "name_de": "Frei / Ausgang",
+      "keywords": [
+        "frei",
+        "ausgang",
+        "libur"
+      ],
+      "default_activities_de": [
+        "Frei / Ausgang laut Dienstplan"
+      ]
+    }
+  ]
+}

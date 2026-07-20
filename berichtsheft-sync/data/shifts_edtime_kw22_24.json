@@ -1,0 +1,79 @@
+{
+  "source": "edtime-screenshot",
+  "note": "KW 22–24 — mengikuti EdTime (bukan asumsi Mo–Fr kerja / weekend libur)",
+  "shifts": [
+    {"date": "2026-05-25", "day_type": "frei", "tags": ["Ausgang"]},
+    {"date": "2026-05-26", "day_type": "frei", "tags": ["Ausgang"]},
+    {"date": "2026-05-27", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-05-28", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-05-29", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-05-30", "day_type": "frei", "tags": ["Ausgang"]},
+    {
+      "date": "2026-05-31",
+      "day_type": "arbeit",
+      "start": "08:00",
+      "end": "16:30",
+      "tags": ["BAF", "Housekeeping"],
+      "segments": [
+        {"start": "08:00", "end": "16:30", "code": "BAF", "label": "BAF"},
+        {"start": null, "end": null, "code": "Housekeeping", "label": "Housekeeping", "parallel": true}
+      ]
+    },
+    {
+      "date": "2026-06-01",
+      "day_type": "arbeit",
+      "start": "10:00",
+      "end": "18:30",
+      "tags": ["BRF"],
+      "segments": [{"start": "10:00", "end": "18:30", "code": "BRF", "label": "Frühstück"}]
+    },
+    {"date": "2026-06-02", "day_type": "frei", "tags": ["Ausgang"]},
+    {"date": "2026-06-03", "day_type": "frei", "tags": ["Ausgang"]},
+    {
+      "date": "2026-06-04",
+      "day_type": "arbeit",
+      "start": "07:00",
+      "end": "15:30",
+      "tags": ["FS2"],
+      "segments": [
+        {"start": "07:00", "end": "12:00", "code": "BRE+TG MEP", "label": "Frühstück & Tagungsvorbereitung MEP"},
+        {"start": "12:00", "end": "15:30", "code": "Tagungen", "label": "Tagungsbetreuung"}
+      ]
+    },
+    {
+      "date": "2026-06-05",
+      "day_type": "arbeit",
+      "start": "10:00",
+      "end": "18:30",
+      "tags": ["BRF", "Housekeeping"],
+      "segments": [
+        {"start": "10:00", "end": "18:30", "code": "BRF", "label": "Frühstück"},
+        {"start": null, "end": null, "code": "Housekeeping", "label": "Housekeeping", "parallel": true}
+      ]
+    },
+    {
+      "date": "2026-06-06",
+      "day_type": "arbeit",
+      "start": "10:00",
+      "end": "18:30",
+      "tags": ["BRF", "Housekeeping"],
+      "segments": [
+        {"start": "10:00", "end": "18:30", "code": "BRF", "label": "Frühstück"},
+        {"start": null, "end": null, "code": "Housekeeping", "label": "Housekeeping", "parallel": true}
+      ]
+    },
+    {
+      "date": "2026-06-07",
+      "day_type": "arbeit",
+      "start": "10:00",
+      "end": "18:30",
+      "tags": ["BRF"],
+      "segments": [{"start": "10:00", "end": "18:30", "code": "BRF", "label": "Frühstück"}]
+    },
+    {"date": "2026-06-08", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-06-09", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-06-10", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-06-11", "day_type": "schule", "tags": ["Schule"]},
+    {"date": "2026-06-12", "day_type": "schule", "tags": ["Schule"]}
+  ]
+}

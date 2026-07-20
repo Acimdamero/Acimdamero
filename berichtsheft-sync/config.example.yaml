@@ -1,0 +1,32 @@
+# Salin ke config.yaml dan sesuaikan
+
+blok:
+  base_url: "https://www.online-ausbildungsnachweis.de"
+  login_path: "/blok/login"   # sesuaikan setelah discovery
+  report_path: "/blok/report"
+  # Selector CSS — WAJIB disesuaikan setelah inspect BLok (F12)
+  selectors:
+    username: 'input[name="username"]'
+    password: 'input[name="password"]'
+    login_button: 'button[type="submit"]'
+    activity_text: 'textarea'
+    hours_field: 'input[name="hours"]'
+    save_button: 'button[type="submit"]'
+
+orchestrator:
+  auto_fill_blok_after_finish: true
+  live_blok_after_finish: false
+  require_ok_before_submit: true
+
+telegram:
+  # Token & user id di .env (lebih aman)
+
+wifi:
+  ssid: "GANTI-NAMA-SSID"
+  portal_url: "http://portal.example/login"
+  login_button_selector: "a.login, button#login, input[type=submit]"
+  check_interval_minutes: 10
+
+server:
+  host: "127.0.0.1"
+  port: 8765

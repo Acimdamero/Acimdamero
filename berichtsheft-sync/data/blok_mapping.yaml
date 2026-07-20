@@ -1,0 +1,28 @@
+# EdTime / kode kerja → field BLok (sesuaikan nama persis seperti di dropdown BLok)
+# Katalog lengkap kegiatan: data/katalog_abteilung.json
+
+presence:
+  arbeit: Anwesend
+  schule: Anwesend
+  frei: Abwesend
+
+location:
+  arbeit: Ausbildungsbetrieb
+  schule: Berufsschule
+
+# Weekend kerja: ubah Wochenende → Anwesend agar textarea muncul
+weekend_arbeit_presence: Anwesend
+
+# Nilai harus cocok dengan dropdown Abteilung di BLok
+abteilung:
+  default: ""
+  BRF: Service
+  BAF: Service
+  HK: Housekeeping
+  Housekeeping: Housekeeping
+  Tagungen: Tagungen
+  "BRE+TG MEP": Tagungen
+  FS2: Tagungen
+  Schule: Berufsschule
+  frei: ""
+  Ausgang: ""

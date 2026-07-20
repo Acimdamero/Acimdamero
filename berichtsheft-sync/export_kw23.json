@@ -1,0 +1,58 @@
+[
+  {
+    "date": "2026-06-01",
+    "ort": "Betrieb",
+    "hours": "10:00–18:30 Uhr",
+    "lernfeld": "Gästeservice und Kommunikation",
+    "taetigkeiten": "Dienstplan:\n• 10:00–18:30: Frühstück\n\nMithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
+    "status": "draft"
+  },
+  {
+    "date": "2026-06-02",
+    "ort": "Frei",
+    "hours": null,
+    "lernfeld": null,
+    "taetigkeiten": "Frei (Ausgang) laut Dienstplan — kein betrieblicher Nachweis.",
+    "status": "draft"
+  },
+  {
+    "date": "2026-06-03",
+    "ort": "Frei",
+    "hours": null,
+    "lernfeld": null,
+    "taetigkeiten": "Frei (Ausgang) laut Dienstplan — kein betrieblicher Nachweis.",
+    "status": "draft"
+  },
+  {
+    "date": "2026-06-04",
+    "ort": "Betrieb",
+    "hours": "07:00–15:30 Uhr",
+    "lernfeld": "Veranstaltungen und Tagungsbetreuung",
+    "taetigkeiten": "Dienstplan:\n• 07:00–12:00: Frühstück & Tagungsvorbereitung MEP\n• 12:00–15:30: Tagungsbetreuung\n\nAufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.\n\nBetreuung der Tagungsteilnehmer: Getränke, Pausenversorgung und technische Rückmeldungen.\n\nFrühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.",
+    "status": "draft"
+  },
+  {
+    "date": "2026-06-05",
+    "ort": "Betrieb",
+    "hours": "10:00–18:30 Uhr",
+    "lernfeld": "Gästeservice und Kommunikation; Wirtschafts- und Sozialprozesse",
+    "taetigkeiten": "Dienstplan:\n• 10:00–18:30: Frühstück\n• Zusätzlich: Housekeeping\n\nUnterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.\n\nZimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.",
+    "status": "draft"
+  },
+  {
+    "date": "2026-06-06",
+    "ort": "Betrieb",
+    "hours": "10:00–18:30 Uhr",
+    "lernfeld": "Gästeservice und Kommunikation; Wirtschafts- und Sozialprozesse",
+    "taetigkeiten": "Dienstplan:\n• 10:00–18:30: Frühstück\n• Zusätzlich: Housekeeping\n\nUnterstützung beim Frühstücksservice: Gäste begrüßen, Buffet auffüllen und Getränke nachfüllen.\n\nZimmerreinigung und Kontrolle der Zimmerausstattung nach Hotelstandard.",
+    "status": "draft"
+  },
+  {
+    "date": "2026-06-07",
+    "ort": "Betrieb",
+    "hours": "10:00–18:30 Uhr",
+    "lernfeld": "Gästeservice und Kommunikation",
+    "taetigkeiten": "Dienstplan:\n• 10:00–18:30: Frühstück\n\nGästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.",
+    "status": "draft"
+  }
+]
