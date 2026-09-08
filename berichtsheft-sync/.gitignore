@@ -2,6 +2,8 @@
 .env
 *.db
 data/telegram_chat_id.txt
+data/whatsapp_chat_id.txt
+data/whatsapp_seen_ids.json
 data/attachments/
 
 # Konfigurasi lokal (salin dari config.example.yaml)

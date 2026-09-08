@@ -83,6 +83,22 @@ def health():
     }
 
 
+@app.post("/whatsapp/webhook")
+@app.post("/waha/webhook")
+def whatsapp_webhook(payload: dict):
+    """Terima event WAHA → balas lewat WhatsApp bot Berichtsheft."""
+    from berichtsheft.whatsapp_bot import handle_incoming_text, parse_waha_webhook
+
+    parsed = parse_waha_webhook(payload)
+    if not parsed:
+        return {"ok": True, "ignored": True}
+    chat_id, text, from_me = parsed
+    if from_me:
+        return {"ok": True, "ignored": "from_me"}
+    handle_incoming_text(chat_id, text, from_me=False)
+    return {"ok": True}
+
+
 @app.get("/catalog")
 def get_catalog(abteilung: Optional[str] = None, code: Optional[str] = None):
     """Katalog kegiatan per Abteilung (dari data/katalog_abteilung.json)."""

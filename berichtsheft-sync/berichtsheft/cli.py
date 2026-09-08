@@ -323,6 +323,40 @@ def cmd_menu_push(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_wa_check(_: argparse.Namespace) -> int:
+    from berichtsheft.whatsapp_bot import check_waha
+
+    result = check_waha()
+    if not result.get("ok"):
+        print(f"✗ WAHA: {result.get('error')}")
+        print("  Pastikan Docker WAHA jalan: docker compose -f mac-iphone-automation/docker/docker-compose.waha.yml up -d")
+        return 1
+    print(f"✓ WAHA {result['base']} session={result['session']}")
+    if result.get("allowed"):
+        print(f"✓ Nomor diizinkan: {', '.join(result.get('allowed_numbers') or [])}")
+    else:
+        print("⚠ WHATSAPP_ALLOWED_NUMBER belum diisi di .env (contoh: 6281234567890)")
+    return 0
+
+
+def cmd_wa_bot(_: argparse.Namespace) -> int:
+    from berichtsheft.whatsapp_bot import run_polling
+
+    run_polling()
+    return 0
+
+
+def cmd_wa_menu_push(_: argparse.Namespace) -> int:
+    from berichtsheft.whatsapp_bot import push_menu
+
+    try:
+        push_menu()
+    except SystemExit as e:
+        print(f"✗ {e}")
+        return 1
+    return 0
+
+
 def cmd_telegram_init(_: argparse.Namespace) -> int:
     from berichtsheft.telegram_setup import ensure_env_file
 
@@ -520,6 +554,17 @@ def main() -> int:
         "menu-push",
         help="paksa refresh tombol menu + daftar perintah di Telegram",
     ).set_defaults(func=cmd_menu_push)
+    sub.add_parser("wa-check", help="cek WAHA + nomor WhatsApp diizinkan").set_defaults(
+        func=cmd_wa_check
+    )
+    sub.add_parser(
+        "wa-bot",
+        help="bot WhatsApp (WAHA polling) → API lokal",
+    ).set_defaults(func=cmd_wa_bot)
+    sub.add_parser(
+        "wa-menu-push",
+        help="kirim menu Berichtsheft ke nomor WhatsApp Anda",
+    ).set_defaults(func=cmd_wa_menu_push)
     sub.add_parser("gemini-check", help="uji Gemini API key").set_defaults(
         func=cmd_gemini_check
     )
