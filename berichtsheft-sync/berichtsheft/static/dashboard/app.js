@@ -92,7 +92,7 @@
     document.getElementById("auth-note").textContent = h.auth_note || "";
 
     const cells = [
-      ["API", true, h.api],
+      ["API", true, true],
       ["Gemini key", h.gemini_key_present, h.gemini_enabled],
       ["Vision", h.vision_enabled, h.vision_enabled],
       ["Cursor", h.cursor_available, h.cursor_available],
@@ -101,14 +101,14 @@
       ["WA allowlist", h.whatsapp_allowlist_set, h.whatsapp_allowlist_set],
       ["WA chat saved", h.whatsapp_chat_id_saved, h.whatsapp_chat_id_saved],
       ["WAHA", Boolean(h.waha && h.waha.ok), Boolean(h.waha && h.waha.ok)],
-      ["Dash token", h.dashboard_token_required, !h.dashboard_token_required || true],
+      ["Token required", h.dashboard_token_required, true],
     ];
 
     const grid = document.getElementById("health-grid");
     grid.innerHTML = cells
       .map(([label, present, ok]) => {
-        const cls = ok ? "ok" : present === false ? "bad" : "bad";
-        const val = ok ? "yes" : "no";
+        const cls = ok ? "ok" : "bad";
+        const val = present ? "yes" : "no";
         return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${cls}">${val}</div></div>`;
       })
       .join("");
