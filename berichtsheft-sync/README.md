@@ -1,6 +1,6 @@
 # Berichtsheft-Sync — Otomatisasi Berichtsheft Hotelfachmann Azubi
 
-Sistem **semi-otomatis** untuk mengisi **Berichtsheft** (BLok) bagi Azubi **Hotelfachmann** di Jerman: catatan harian lewat **Telegram (HP)** → orkestrator di **Mac** → isi form **BLok** di web → Anda cek dan setujui dalam **~5 menit** (`/ok`).
+Sistem **semi-otomatis** untuk mengisi **Berichtsheft** (BLok) bagi Azubi **Hotelfachmann** di Jerman: catatan harian lewat **Telegram** atau **WhatsApp (HP)** → orkestrator di **Mac** → isi form **BLok** di web → Anda cek dan setujui dalam **~5 menit** (`/ok`).
 
 > Dibangun untuk alur kerja nyata: jadwal dari EdTime (import JSON), log aktivitas saat shift, terjemahan Indonesia→Jerman, dan worker browser Playwright yang mengisi BLok format **Woche** (Senin–Jumat).
 
@@ -11,6 +11,7 @@ Sistem **semi-otomatis** untuk mengisi **Berichtsheft** (BLok) bagi Azubi **Hote
 | Fitur | Deskripsi |
 |-------|-----------|
 | **Telegram bot** | `/log`, `/selesai`, `/ok`, `/ubah`, `/status`, `/minggu`, `/audit` |
+| **WhatsApp bot** | Nomor personal via WAHA — menu bernomor + perintah sama seperti Telegram |
 | **Gemini Vision** | Kirim foto (jadwal EdTime, kegiatan, berufsschule) → teks Jerman |
 | **Orkestrator** | Gabung log harian + shift + template → draft Berichtsheft |
 | **BLok worker** | Dry-run (HTML) dan **live** (Playwright + Keychain) |
@@ -27,6 +28,7 @@ Sistem **semi-otomatis** untuk mengisi **Berichtsheft** (BLok) bagi Azubi **Hote
 - **SQLite** — shifts, work logs, drafts, approvals
 - **Playwright** — automasi browser BLok
 - **Telegram Bot API** — input dari HP
+- **WAHA** — WhatsApp personal (self-host, sama stack Automation Hub)
 - **Google Gemini** — polish teks & analisis foto (opsional)
 - **Node.js** — `@cursor/sdk` untuk integrasi Cursor (opsional)
 
@@ -50,6 +52,7 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arsitektur Mac + Keychain |
 | [docs/BLok_LIVE.md](docs/BLok_LIVE.md) | Panduan isi BLok live |
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Setup bot Telegram |
+| [docs/WHATSAPP.md](docs/WHATSAPP.md) | **Setup bot WhatsApp (WAHA + nomor personal)** |
 | [docs/GEMINI.md](docs/GEMINI.md) | Setup Gemini API |
 
 ---
@@ -109,7 +112,8 @@ berichtsheft-sync/
 │   ├── catalog.py      # Katalog kegiatan per Abteilung
 │   ├── cli.py          # Perintah CLI
 │   ├── telegram_bot.py # Bot Telegram
-│   ├── api_server.py   # REST API lokal
+│   ├── whatsapp_bot.py # Bot WhatsApp (WAHA)
+│   ├── api_server.py   # REST API lokal (+ webhook WA)
 │   ├── orchestrator.py # Gabung log → draft
 │   ├── blok_worker.py  # Playwright BLok
 │   └── ...
@@ -130,9 +134,9 @@ berichtsheft-sync/
 
 ## Keamanan
 
-- **Jangan commit** `.env`, `berichtsheft.db`, `config.yaml` lokal, atau `data/telegram_chat_id.txt`
+- **Jangan commit** `.env`, `berichtsheft.db`, `config.yaml` lokal, `data/telegram_chat_id.txt`, atau `data/whatsapp_*.txt` / `whatsapp_seen_ids.json`
 - Password BLok **hanya** di macOS Keychain
-- Token Telegram & API key di `.env` (sudah di `.gitignore`)
+- Token Telegram, WAHA key & API key di `.env` (sudah di `.gitignore`)
 
 ---
 
