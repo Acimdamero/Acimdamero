@@ -38,10 +38,63 @@ def _saved_chat_id() -> int | None:
         return None
 
 
-def _send(token: str, chat_id: int, text: str) -> None:
+# Tombol menu utama (boleh diedit label nanti; map di MENU_ACTIONS)
+BTN_LOG = "📝 Log"
+BTN_SELESAI = "✅ Selesai"
+BTN_STATUS = "📊 Status"
+BTN_OK = "👍 OK"
+BTN_MINGGU = "📅 Minggu"
+BTN_AUDIT = "🔍 Audit"
+BTN_FOTO = "📷 Foto"
+BTN_LAMPIRAN = "📎 Lampiran"
+BTN_UBAH = "✏️ Ubah"
+BTN_AI = "🤖 AI"
+BTN_HELP = "❓ Help"
+BTN_MENU = "☰ Menu"
+
+MENU_ACTIONS: dict[str, str] = {
+    BTN_LOG: "__prompt_log__",
+    BTN_SELESAI: "/selesai",
+    BTN_STATUS: "/status",
+    BTN_OK: "/ok",
+    BTN_MINGGU: "/minggu",
+    BTN_AUDIT: "/audit",
+    BTN_FOTO: "/foto",
+    BTN_LAMPIRAN: "/lampiran",
+    BTN_UBAH: "__prompt_ubah__",
+    BTN_AI: "__prompt_ai__",
+    BTN_HELP: "/help",
+    BTN_MENU: "/menu",
+}
+
+
+def _main_menu_keyboard() -> dict:
+    """Reply keyboard — opsi sesuai perintah bot yang sudah ada."""
+    return {
+        "keyboard": [
+            [{"text": BTN_LOG}, {"text": BTN_SELESAI}, {"text": BTN_STATUS}],
+            [{"text": BTN_OK}, {"text": BTN_MINGGU}, {"text": BTN_AUDIT}],
+            [{"text": BTN_FOTO}, {"text": BTN_LAMPIRAN}, {"text": BTN_UBAH}],
+            [{"text": BTN_AI}, {"text": BTN_HELP}, {"text": BTN_MENU}],
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True,
+    }
+
+
+def _send(
+    token: str,
+    chat_id: int,
+    text: str,
+    *,
+    reply_markup: dict | None = None,
+) -> None:
+    payload: dict = {"chat_id": chat_id, "text": text[:4000]}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     httpx.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
-        json={"chat_id": chat_id, "text": text[:4000]},
+        json=payload,
         timeout=30,
     )
 
@@ -156,9 +209,11 @@ def _help_text(user_id: int) -> str:
     )
     return (
         "Berichtsheft-Sync\n\n"
+        "☰ Pakai tombol menu di bawah chat, atau ketik perintah.\n\n"
         "📝 Log kerja:\n"
         "• Kirim teks biasa = log\n"
-        "• /log … — catatan eksplisit\n\n"
+        "• /log … — catatan eksplisit\n"
+        f"• Tombol {BTN_LOG} — minta Anda kirim teks\n\n"
         "📷 Foto (Gemini Vision):\n"
         "• Kirim foto + caption (stichpunkte, berufsschule, edtime, lampiran)\n"
         "• /foto — bantuan foto\n\n"
@@ -177,8 +232,41 @@ def _help_text(user_id: int) -> str:
         "• /audit — scan lebih luas (kosong, draft, foto)\n"
         "  Bot mengingatkan otomatis jika ada yang kurang\n\n"
         "🤖 Cursor: /ai perintah … (1–5 menit)\n"
+        "• /menu — tampilkan lagi tombol keyboard\n"
         + uid_hint
     )
+
+
+def _resolve_menu_text(text: str) -> str | None:
+    """Map label tombol → perintah atau aksi khusus. None = bukan tombol menu."""
+    return MENU_ACTIONS.get(text.strip())
+
+
+def _prompt_for(token: str, chat_id: int, kind: str) -> None:
+    if kind == "__prompt_log__":
+        _send(
+            token,
+            chat_id,
+            "📝 Kirim teks kegiatan sekarang (satu pesan).\n"
+            "Contoh: Buffet auffüllen und Gäste begrüßen",
+        )
+    elif kind == "__prompt_ubah__":
+        _send(
+            token,
+            chat_id,
+            "✏️ Koreksi harus satu pesan dengan /ubah …\n\n"
+            "Contoh:\n"
+            "/ubah Bitte formell auf Deutsch mit Hotelfachbegriffen",
+        )
+    elif kind == "__prompt_ai__":
+        _send(
+            token,
+            chat_id,
+            "🤖 Format: /ai perintah Anda\n\n"
+            "Contoh:\n/ai ringkas log hari ini ke Stichpunkte DE",
+        )
+    else:
+        _send(token, chat_id, "Perintah tidak dikenal. /help")
 
 
 def _format_lampiran(data: dict) -> str:
@@ -211,8 +299,13 @@ def _handle_command(token: str, chat_id: int, user_id: int, text: str) -> None:
     arg = text.strip()[len(parts[0]) :].strip() if len(parts) > 1 else ""
 
     with httpx.Client(base_url=API_BASE, timeout=60) as client:
-        if cmd in ("/start", "/help"):
-            _send(token, chat_id, _help_text(user_id))
+        if cmd in ("/start", "/help", "/menu"):
+            _send(
+                token,
+                chat_id,
+                _help_text(user_id),
+                reply_markup=_main_menu_keyboard(),
+            )
         elif cmd == "/foto":
             _send(
                 token,
@@ -507,6 +600,18 @@ def run_polling() -> None:
 
                 if not text:
                     continue
+
+                action = _resolve_menu_text(text)
+                if action == "/menu":
+                    _handle_command(token, cid, uid, "/menu")
+                    continue
+                if action and action.startswith("__prompt_"):
+                    _prompt_for(token, cid, action)
+                    continue
+                if action and action.startswith("/"):
+                    _handle_command(token, cid, uid, action)
+                    continue
+
                 if text.startswith("/"):
                     _handle_command(token, cid, uid, text)
                 else:

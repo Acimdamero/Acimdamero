@@ -49,10 +49,31 @@ Mac harus online; API di `127.0.0.1:8765`.
 ## 5. Di HP
 
 1. Cari bot Anda (username dari BotFather)
-2. **Start** → `/start` → catat **User ID** → isi di `.env` → restart bot
-3. Saat kerja: kirim teks atau `/log …`
-4. Selesai: `/selesai`
-5. Cek preview → `/ok`
+2. **Start** → `/start` → muncul **tombol menu** di bawah chat + User ID
+3. Isi `TELEGRAM_ALLOWED_USER_ID` di `.env` → restart bot
+4. Saat kerja: ketuk **📝 Log** lalu kirim teks, atau kirim teks langsung
+5. Selesai: ketuk **✅ Selesai** → cek preview → **👍 OK**
+
+## Menu tombol (Reply Keyboard)
+
+Setelah `/start` atau `/menu`, keyboard tetap di bawah chat:
+
+| Tombol | Aksi |
+|--------|------|
+| 📝 Log | Minta Anda kirim teks kegiatan |
+| ✅ Selesai | `/selesai` |
+| 📊 Status | `/status` |
+| 👍 OK | `/ok` |
+| 📅 Minggu | `/minggu` |
+| 🔍 Audit | `/audit` |
+| 📷 Foto | Bantuan foto |
+| 📎 Lampiran | `/lampiran` |
+| ✏️ Ubah | Petunjuk `/ubah …` |
+| 🤖 AI | Petunjuk `/ai …` |
+| ❓ Help | `/help` |
+| ☰ Menu | Tampilkan lagi keyboard + bantuan |
+
+Label tombol bisa diubah nanti di `berichtsheft/telegram_bot.py` (`BTN_*` + `MENU_ACTIONS`).
 
 ## Perintah
 
@@ -64,3 +85,4 @@ Mac harus online; API di `127.0.0.1:8765`.
 | `/status` | Status hari ini |
 | `/ok` | Setujui |
 | `/ubah …` | Koreksi |
+| `/menu` | Tampilkan tombol keyboard |
