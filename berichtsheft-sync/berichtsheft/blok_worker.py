@@ -11,6 +11,7 @@ from typing import Any
 from berichtsheft import credentials, db
 from berichtsheft.blok_fields import apply_day_fields
 from berichtsheft.blok_hours import DEFAULT_STUNDEN, stunden_for_blok
+from berichtsheft.blok_live_snapshot import resolve_base_url
 from berichtsheft.blok_nav import go_to_week_containing_with_fallback
 from berichtsheft.blok_status import live_fill_allowed
 from berichtsheft.config_loader import ROOT, load_config
@@ -111,13 +112,15 @@ def live_fill(conn, iso_date: str) -> dict[str, Any]:
     cred = credentials.get_credential("blok")
     if not cred:
         raise RuntimeError(
-            "BLok credentials missing. Run: python3 -m berichtsheft credentials set --service blok"
+            "BLok credentials missing. Mac: python3 -m berichtsheft credentials set --service blok. "
+            "Cloud: set BLOK_USERNAME + BLOK_PASSWORD in .env (do not commit)."
         )
     username, password = cred
     payload = _draft_payload(conn, iso_date)
     cfg = load_config()
     blok = cfg.get("blok") or {}
-    base_url = blok.get("base_url", "https://www.online-ausbildungsnachweis.de")
+    # Env BLOK_BASE_URL (cloud) overrides config; Keychain still preferred for password.
+    base_url = resolve_base_url(cfg)
     selectors = blok.get("selectors") or {}
 
     try:
@@ -127,8 +130,9 @@ def live_fill(conn, iso_date: str) -> dict[str, Any]:
 
     if " " in username or "python" in username.lower():
         raise RuntimeError(
-            f"Username Keychain tidak valid: '{username[:40]}...'. "
-            "Jalankan: python3 -m berichtsheft credentials set --service blok"
+            f"Username Keychain/env tidak valid: '{username[:40]}...'. "
+            "Jalankan: python3 -m berichtsheft credentials set --service blok "
+            "atau set BLOK_USERNAME/BLOK_PASSWORD di .env (cloud)."
         )
 
     status_msg = ""

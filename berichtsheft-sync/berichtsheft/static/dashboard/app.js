@@ -333,17 +333,57 @@
     const openBtn = document.getElementById("blok-open-btn");
     openBtn.href = data.login_url || data.blok_url || openBtn.href;
     document.getElementById("blok-cta-hint").textContent = blocked
-      ? "iframe diblokir — buka akun BLok Anda di tab baru."
+      ? "iframe diblokir — snapshot live atau buka BLok di tab baru."
       : "Embed iframe aktif; tombol cadangan tetap tersedia.";
 
     const creds = data.credentials || {};
+    const snap = data.live_snapshot || {};
+    const snapBtn = document.getElementById("blok-snapshot-btn");
+    snapBtn.disabled = false;
+    snapBtn.title = creds.credential_resolvable
+      ? "Login BLok via Playwright lalu simpan screenshot"
+      : "Butuh BLOK_USERNAME + BLOK_PASSWORD di .env atau Keychain";
+
+    const liveStatus = document.getElementById("blok-live-status");
+    const liveTitle = document.getElementById("blok-live-status-title");
+    const liveDetail = document.getElementById("blok-live-status-detail");
+    if (snap.available || snap.status) {
+      liveStatus.classList.remove("hidden");
+      const logged = Boolean(snap.logged_in);
+      liveStatus.className = "banner " + (logged ? "ok" : "warn");
+      liveTitle.textContent = logged
+        ? "Status: logged in"
+        : `Status: ${snap.status || "failed"}`;
+      const bits = [];
+      if (snap.taken_at) bits.push(`taken ${snap.taken_at}`);
+      if (snap.error) bits.push(snap.error);
+      liveDetail.textContent = bits.join(" · ") || (logged ? "Screenshot siap." : "Belum login.");
+    } else {
+      liveStatus.classList.add("hidden");
+    }
+
+    const liveImg = document.getElementById("blok-live-latest");
+    const liveEmpty = document.getElementById("blok-live-empty");
+    if (snap.image_url) {
+      liveImg.classList.remove("hidden");
+      liveImg.src = snap.image_url + (snap.taken_at ? `?t=${encodeURIComponent(snap.taken_at)}` : `?t=${Date.now()}`);
+      liveEmpty.classList.add("hidden");
+    } else {
+      liveImg.classList.add("hidden");
+      liveImg.removeAttribute("src");
+      liveEmpty.classList.remove("hidden");
+      liveEmpty.textContent = creds.credential_resolvable
+        ? "Belum ada snapshot. Klik Ambil snapshot live."
+        : "Belum ada snapshot. Set BLOK_USERNAME + BLOK_PASSWORD di .env (cloud) atau Keychain di Mac.";
+    }
+
     const cells = [
-      ["Embed mode", data.embed_mode || "—", data.embed_mode === "iframe"],
+      ["Embed mode", data.embed_mode || "—", data.embed_mode === "iframe" || data.embed_mode === "screenshot"],
       ["Iframe allowed", data.iframe_allowed, data.iframe_allowed],
       ["Live creds", creds.credential_resolvable, creds.credential_resolvable],
       ["Creds source", creds.source || "none", creds.source && creds.source !== "none"],
+      ["Snapshot", snap.logged_in ? "logged in" : snap.status || "none", Boolean(snap.logged_in)],
       ["Keychain", Boolean(data.keychain_available), Boolean(data.keychain_available)],
-      ["Proxy", data.proxy && data.proxy.enabled, false],
     ];
     document.getElementById("blok-status-grid").innerHTML = cells
       .map(([label, val, ok]) => {
@@ -374,9 +414,7 @@
           `<button type="button" data-url="${esc(f.preview_url)}" data-kind="image">${esc(f.name)}</button>`
       )
       .join("") ||
-      (creds.credential_resolvable
-        ? '<span class="hint">Belum ada screenshot live (*_live.png). Jalankan worker --live di Mac / dengan env.</span>'
-        : '<span class="hint">Screenshot live membutuhkan BLOK_USERNAME/BLOK_PASSWORD di .env atau Keychain — belum di-set.</span>');
+      '<span class="hint">Worker --live screenshots (*_live.png) muncul di sini jika pernah dijalankan.</span>';
 
     const iframe = document.getElementById("blok-iframe");
     const pre = document.getElementById("blok-json");
@@ -411,11 +449,44 @@
       }
     );
 
-    const firstShot = (data.live_screenshots || [])[0];
     const firstHtml = (data.files || []).find((f) => f.kind === "html");
-    if (firstShot) showPreview(firstShot.preview_url, "image");
-    else if (firstHtml) showPreview(firstHtml.preview_url, "html");
+    if (firstHtml && !snap.image_url) showPreview(firstHtml.preview_url, "html");
   }
+
+  document.getElementById("blok-snapshot-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("blok-snapshot-btn");
+    const liveStatus = document.getElementById("blok-live-status");
+    const liveTitle = document.getElementById("blok-live-status-title");
+    const liveDetail = document.getElementById("blok-live-status-detail");
+    btn.disabled = true;
+    liveStatus.classList.remove("hidden");
+    liveStatus.className = "banner warn";
+    liveTitle.textContent = "Mengambil snapshot…";
+    liveDetail.textContent = "Playwright login ke BLok (bisa 15–60 detik).";
+    try {
+      const data = await api("/dashboard/api/blok/live-snapshot", { method: "POST" });
+      liveStatus.className = "banner " + (data.logged_in ? "ok" : "warn");
+      liveTitle.textContent = data.logged_in
+        ? "Status: logged in"
+        : `Status: ${data.status || "failed"}`;
+      liveDetail.textContent = data.error || data.final_url || "Selesai.";
+      const liveImg = document.getElementById("blok-live-latest");
+      const liveEmpty = document.getElementById("blok-live-empty");
+      if (data.image_url) {
+        liveImg.classList.remove("hidden");
+        liveImg.src = data.image_url + `?t=${Date.now()}`;
+        liveEmpty.classList.add("hidden");
+      }
+      await loadBlok();
+    } catch (e) {
+      liveStatus.className = "banner warn";
+      liveTitle.textContent = "Status: failed";
+      liveDetail.textContent = e.message || String(e);
+      showErr(e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   async function loadBots() {
     const data = await api("/dashboard/api/bots");

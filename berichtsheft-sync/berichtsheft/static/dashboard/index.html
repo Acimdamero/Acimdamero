@@ -137,10 +137,20 @@
           <a id="blok-open-btn" class="cta-blok" href="https://www.online-ausbildungsnachweis.de/blok/login" target="_blank" rel="noopener noreferrer">
             Buka BLok
           </a>
+          <button type="button" id="blok-snapshot-btn" class="cta-blok secondary">
+            Ambil snapshot live
+          </button>
           <span id="blok-cta-hint" class="hint">Login resmi di tab baru (iframe biasanya diblokir situs BLok).</span>
+        </div>
+        <div id="blok-live-status" class="banner warn hidden">
+          <strong id="blok-live-status-title">Snapshot</strong>
+          <span id="blok-live-status-detail"></span>
         </div>
         <div id="blok-status-grid" class="grid cards" style="margin: 1rem 0"></div>
         <div id="blok-meta" class="meta"></div>
+        <h2 class="blok-section-title">Live snapshot</h2>
+        <img id="blok-live-latest" class="blok-shot hidden" alt="BLok live snapshot terbaru" />
+        <p id="blok-live-empty" class="hint">Belum ada snapshot. Klik Ambil snapshot live (butuh BLOK_USERNAME/PASSWORD).</p>
         <h2 class="blok-section-title">Dry-run / worker output</h2>
         <div id="blok-files" class="file-list"></div>
         <div id="blok-shots" class="file-list"></div>

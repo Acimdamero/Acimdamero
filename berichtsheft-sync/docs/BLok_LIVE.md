@@ -59,6 +59,26 @@ Setelah selector benar:
 
 Saat ini `/selesai` di bot = **dry-run**; live = perintah `worker --live` di Mac atau kita aktifkan flag live nanti.
 
+## Cloud / VM — live snapshot dashboard
+
+Di Cloud Agent (tanpa Keychain):
+
+```bash
+# .env (jangan commit)
+BLOK_USERNAME=...
+BLOK_PASSWORD=...
+# opsional:
+# BLOK_BASE_URL=https://www.online-ausbildungsnachweis.de
+
+python3 -m playwright install chromium
+python3 -m berichtsheft serve
+# Dashboard → BLok Live → Ambil snapshot live
+# atau: curl -X POST -H "X-Dashboard-Token: $DASHBOARD_TOKEN" \
+#   http://127.0.0.1:8765/dashboard/api/blok/live-snapshot
+```
+
+Hasil: `output/blok_live/latest.png` + `meta.json` (status logged_in / failed).
+
 ## Troubleshooting
 
 | Masalah | Solusi |

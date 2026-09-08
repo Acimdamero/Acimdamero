@@ -76,7 +76,7 @@ Jika `DASHBOARD_TOKEN` **kosong**, dashboard terbuka tanpa auth — **hanya** un
 | **Katalog / Abteilung** | Editor JSON untuk `data/katalog_abteilung.json` → Save menulis file + `catalog.sync_to_db` + export legacy |
 | **Jadwal / Shifts** | Tabel SQLite shifts (upsert/delete) + editor sample `data/shifts_kw23_24.json` (save + import DB) |
 | **Sekolah / Templates** | Baca Abteilung Schule dari katalog + template texts |
-| **BLok Live** | Tombol **Buka BLok** (tab baru ke `/blok/login`); status CSP/iframe; dry-run HTML/JSON + screenshot live jika ada. **Bukan** sesi BLok interaktif di dalam iframe (situs memblokir frame) |
+| **BLok Live** | Tombol **Buka BLok** (tab baru) + **Ambil snapshot live** (Playwright login → `output/blok_live/latest.png`). Status logged in / failed. Iframe tetap diblokir CSP BLok. Dry-run HTML/JSON tetap ada. |
 | **Bots** | Telegram/WhatsApp: chat id tersimpan?, daftar perintah, link docs |
 
 ## BLok di dalam dashboard — batasan penting
@@ -90,8 +90,9 @@ content-security-policy: frame-ancestors 'self' https://mls.mobil-lernen.com htt
 Artinya browser **menolak** embed login BLok di iframe dashboard kita (origin kita tidak ada di daftar). Panel **BLok Live** jujur soal ini (`iframe_allowed: false`) dan mengarahkan ke:
 
 1. **Buka BLok** → `https://www.online-ausbildungsnachweis.de/blok/login` (tab baru) — cara interaktif yang didukung
-2. Preview **dry-run** dari `output/blok_dry_run/` (HTML/JSON worker)
-3. Screenshot live (`*_live.png`) hanya jika worker `--live` pernah jalan (Mac Keychain atau `BLOK_USERNAME`/`BLOK_PASSWORD` di `.env` — **jangan commit**)
+2. **Ambil snapshot live** → `POST /dashboard/api/blok/live-snapshot` (Playwright login + screenshot di `output/blok_live/`)
+3. Preview **dry-run** dari `output/blok_dry_run/` (HTML/JSON worker)
+4. Screenshot worker `--live` (`*_live.png`) jika pernah dijalankan
 
 **Tidak** dipakai: reverse-proxy ke halaman login BLok (cookie `JSESSIONID` Path=`/blok`, Secure, SameSite=None akan rusak / tidak autentik di host kita).
 
@@ -103,9 +104,11 @@ Kredensial cloud (opsional, rahasia):
 # .env — jangan commit
 BLOK_USERNAME=...
 BLOK_PASSWORD=...
+# opsional:
+# BLOK_BASE_URL=https://www.online-ausbildungsnachweis.de
 ```
 
-Tanpa itu, panel tetap menampilkan dry-run + tombol Buka BLok; live screenshot/worker tidak dijalankan otomatis.
+Tanpa itu, panel tetap menampilkan dry-run + tombol Buka BLok; tombol snapshot mengembalikan error 400 sampai kredensial diisi.
 
 ## Edit katalog dari UI
 
@@ -136,6 +139,8 @@ Semua di bawah `/dashboard/api/…` (auth sama seperti di atas):
 - `GET|PUT /dashboard/api/shifts/json`
 - `GET /dashboard/api/school`
 - `GET /dashboard/api/blok`
+- `GET|POST /dashboard/api/blok/live-snapshot` — GET meta/image URL; POST Playwright login + screenshot
+- `GET /dashboard/blok-live/{filename}` — serve `output/blok_live/` (latest.png)
 - `GET /dashboard/api/bots`
 
 ## Keamanan

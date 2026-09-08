@@ -14,15 +14,21 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from berichtsheft import catalog, db
+from berichtsheft import catalog, credentials as cred_mod, db
 from berichtsheft.ai_gemini import is_enabled as gemini_enabled
 from berichtsheft.ai_vision import is_vision_enabled
+from berichtsheft.blok_live_snapshot import (
+    LATEST_PNG as BLOK_LIVE_PNG,
+    read_latest_meta,
+    take_live_snapshot,
+)
 from berichtsheft.config_loader import ROOT, load_config, load_dotenv
 from berichtsheft.cursor_agent import is_available as cursor_available
 from berichtsheft.seed import load_shifts
 
 STATIC_DIR = Path(__file__).resolve().parent / "static" / "dashboard"
 BLOK_DRY_RUN = ROOT / "output" / "blok_dry_run"
+BLOK_LIVE_DIR = ROOT / "output" / "blok_live"
 SHIFTS_SAMPLE = ROOT / "data" / "shifts_kw23_24.json"
 ATTACHMENTS_DIR = ROOT / "data" / "attachments"
 COOKIE_NAME = "bh_dashboard_token"
@@ -214,6 +220,26 @@ def blok_preview(filename: str, _: None = Depends(require_dashboard_access)):
         media = "application/json"
     elif suffix == ".png":
         media = "image/png"
+    elif suffix in (".jpg", ".jpeg"):
+        media = "image/jpeg"
+    elif suffix == ".webp":
+        media = "image/webp"
+    else:
+        media = "application/octet-stream"
+    return FileResponse(path, media_type=media)
+
+
+@router.get("/dashboard/blok-live/{filename}")
+def blok_live_file(filename: str, _: None = Depends(require_dashboard_access)):
+    """Serve screenshots / meta from output/blok_live/ (latest.png, meta.json)."""
+    path = _safe_under(BLOK_LIVE_DIR, filename)
+    if not path.is_file():
+        raise HTTPException(404, "blok live file tidak ada")
+    suffix = path.suffix.lower()
+    if suffix == ".png":
+        media = "image/png"
+    elif suffix == ".json":
+        media = "application/json"
     elif suffix in (".jpg", ".jpeg"):
         media = "image/jpeg"
     elif suffix == ".webp":
@@ -505,9 +531,8 @@ def _blok_credential_status() -> dict[str, Any]:
     load_dotenv()
     env_user = bool(os.environ.get("BLOK_USERNAME", "").strip())
     env_pass = bool(os.environ.get("BLOK_PASSWORD", "").strip())
+    env_base = bool(os.environ.get("BLOK_BASE_URL", "").strip())
     keychain_cli = shutil.which("security") is not None
-    from berichtsheft import credentials as cred_mod
-
     keychain_platform = cred_mod._keychain_available()  # noqa: SLF001
     secrets_file = cred_mod.SECRETS_FILE.is_file()
     stored = False
@@ -527,11 +552,26 @@ def _blok_credential_status() -> dict[str, Any]:
     return {
         "env_username_present": env_user,
         "env_password_present": env_pass,
+        "env_base_url_present": env_base,
         "keychain_cli_present": keychain_cli,
         "keychain_platform": keychain_platform,
         "secrets_file_present": secrets_file,
         "credential_resolvable": stored or (env_user and env_pass),
         "source": source,
+    }
+
+
+def _live_snapshot_summary() -> dict[str, Any]:
+    meta = read_latest_meta() or {}
+    has_png = BLOK_LIVE_PNG.is_file()
+    return {
+        "available": has_png or bool(meta),
+        "logged_in": bool(meta.get("logged_in")),
+        "status": meta.get("status"),
+        "error": meta.get("error"),
+        "taken_at": meta.get("taken_at"),
+        "image_url": "/dashboard/blok-live/latest.png" if has_png else None,
+        "meta": meta or None,
     }
 
 
@@ -561,23 +601,24 @@ def dashboard_blok(_: None = Depends(require_dashboard_access)):
                 )
 
     creds = _blok_credential_status()
+    live_snap = _live_snapshot_summary()
     # Best available embed strategy given CSP + credential availability
     if BLOK_IFRAME_ALLOWED:
         embed_mode = "iframe"
-    elif live_shots and creds["credential_resolvable"]:
+    elif live_snap.get("image_url") or (live_shots and creds["credential_resolvable"]):
         embed_mode = "screenshot"
     else:
         embed_mode = "external_link"
 
-    live_available = creds["credential_resolvable"]  # worker --live possible if set
+    live_available = creds["credential_resolvable"]  # worker --live / snapshot possible if set
     note_parts = [
         "BLok menolak iframe di dashboard kita (CSP frame-ancestors hanya MLS).",
         "Gunakan tombol Buka BLok (tab baru) untuk login interaktif.",
-        "Panel ini menampilkan status + dry-run worker — bukan sesi BLok hidup di dalam frame.",
+        "Atau Ambil snapshot live (Playwright login + screenshot) jika kredensial tersedia.",
     ]
     if not creds["credential_resolvable"]:
         note_parts.append(
-            "Kredensial belum ada di env/Keychain. Untuk live screenshot/worker di cloud: "
+            "Kredensial belum ada di env/Keychain. Untuk live snapshot di cloud: "
             "set BLOK_USERNAME + BLOK_PASSWORD di .env (jangan commit), atau Keychain di Mac."
         )
     elif creds["source"] == "env":
@@ -585,7 +626,7 @@ def dashboard_blok(_: None = Depends(require_dashboard_access)):
 
     return {
         "ok": True,
-        "mode": "live-panel / dry-run outputs",
+        "mode": "live-panel / snapshot / dry-run outputs",
         "embed_mode": embed_mode,
         "iframe_allowed": BLOK_IFRAME_ALLOWED,
         "iframe_blocked_reason": (
@@ -598,6 +639,7 @@ def dashboard_blok(_: None = Depends(require_dashboard_access)):
         "keychain_available": creds["keychain_cli_present"] and creds["keychain_platform"],
         "blok_url": BLOK_BASE_URL,
         "login_url": BLOK_LOGIN_URL,
+        "live_snapshot": live_snap,
         "proxy": {
             "enabled": False,
             "reason": (
@@ -612,15 +654,58 @@ def dashboard_blok(_: None = Depends(require_dashboard_access)):
             "docs/BLok_WOCHE.md",
         ],
         "dry_run_dir": "output/blok_dry_run/",
+        "live_dir": "output/blok_live/",
         "files": files,
         "live_screenshots": live_shots,
         "note": " ".join(note_parts),
         "ui_label": (
-            "iframe diblokir oleh BLok — buka di tab baru"
+            "iframe diblokir oleh BLok — snapshot live atau buka di tab baru"
             if not BLOK_IFRAME_ALLOWED
             else "iframe tersedia"
         ),
     }
+
+
+@router.get("/dashboard/api/blok/live-snapshot")
+def dashboard_blok_live_snapshot_get(_: None = Depends(require_dashboard_access)):
+    """Return latest live snapshot meta + image URL (no Playwright run)."""
+    meta = read_latest_meta()
+    has_png = BLOK_LIVE_PNG.is_file()
+    if not meta and not has_png:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "status": "none",
+            "error": "Belum ada snapshot. POST /dashboard/api/blok/live-snapshot untuk mengambil.",
+            "image_url": None,
+            "credentials": _blok_credential_status(),
+        }
+    body = dict(meta or {})
+    body["ok"] = bool(body.get("logged_in")) if meta else False
+    if has_png:
+        body["image_url"] = "/dashboard/blok-live/latest.png"
+        body["image_path"] = "output/blok_live/latest.png"
+    body["credentials"] = _blok_credential_status()
+    return body
+
+
+@router.post("/dashboard/api/blok/live-snapshot")
+def dashboard_blok_live_snapshot_post(_: None = Depends(require_dashboard_access)):
+    """Playwright login to BLok, save screenshot under output/blok_live/."""
+    creds = _blok_credential_status()
+    if not creds["credential_resolvable"]:
+        raise HTTPException(
+            400,
+            "BLok credentials missing — set BLOK_USERNAME + BLOK_PASSWORD "
+            "in .env (cloud) or Keychain on Mac.",
+        )
+    try:
+        meta = take_live_snapshot()
+    except RuntimeError as e:
+        raise HTTPException(500, str(e)) from e
+    meta = dict(meta)
+    meta["credentials"] = creds
+    return meta
 
 
 # ── Bots ────────────────────────────────────────────────────────────────────

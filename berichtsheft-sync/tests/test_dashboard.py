@@ -135,10 +135,61 @@ class TestDashboard(unittest.TestCase):
         self.assertIn("frame-ancestors", data.get("iframe_blocked_reason") or "")
         self.assertTrue(str(data.get("login_url", "")).endswith("/blok/login"))
         self.assertIn("credentials", data)
+        self.assertIn("live_snapshot", data)
         self.assertFalse(data.get("proxy", {}).get("enabled", True))
         page = self.client.get("/dashboard")
         self.assertIn("BLok Live", page.text)
         self.assertIn("Buka BLok", page.text)
+        self.assertIn("Ambil snapshot live", page.text)
+
+    def test_live_snapshot_get_without_file(self) -> None:
+        r = self.client.get("/dashboard/api/blok/live-snapshot")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn("status", data)
+        self.assertIn("credentials", data)
+
+    def test_live_snapshot_post_requires_credentials(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"BLOK_USERNAME": "", "BLOK_PASSWORD": "", "DASHBOARD_TOKEN": ""},
+            clear=False,
+        ), mock.patch(
+            "berichtsheft.credentials.get_credential", return_value=None
+        ):
+            r = self.client.post("/dashboard/api/blok/live-snapshot")
+            self.assertEqual(r.status_code, 400)
+
+    def test_live_snapshot_post_mocked_success(self) -> None:
+        fake = {
+            "ok": True,
+            "logged_in": True,
+            "status": "logged_in",
+            "error": None,
+            "image_url": "/dashboard/blok-live/latest.png",
+            "image_path": "output/blok_live/latest.png",
+            "taken_at": "2026-09-08T00:00:00+00:00",
+        }
+        with mock.patch.dict(
+            os.environ,
+            {
+                "BLOK_USERNAME": "testuser",
+                "BLOK_PASSWORD": "testpass",
+                "DASHBOARD_TOKEN": "",
+            },
+            clear=False,
+        ), mock.patch(
+            "berichtsheft.credentials.get_credential",
+            return_value=("testuser", "testpass"),
+        ), mock.patch(
+            "berichtsheft.dashboard.take_live_snapshot", return_value=fake
+        ):
+            r = self.client.post("/dashboard/api/blok/live-snapshot")
+            self.assertEqual(r.status_code, 200, r.text)
+            data = r.json()
+            self.assertTrue(data["logged_in"])
+            self.assertEqual(data["image_url"], "/dashboard/blok-live/latest.png")
+            self.assertIn("credentials", data)
 
 
 if __name__ == "__main__":

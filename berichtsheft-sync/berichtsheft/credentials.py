@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import getpass
+import os
 import platform
 import subprocess
 from pathlib import Path
+
+from berichtsheft.config_loader import load_dotenv
 
 SERVICE_PREFIX = "berichtsheft-sync"
 SECRETS_DIR = Path.home() / ".berichtsheft"
@@ -71,10 +74,11 @@ def get_credential(service: str) -> tuple[str, str] | None:
     """Resolve credentials: Keychain (Mac) → local secrets → env (cloud).
 
     Env fallback (never commit): BLOK_USERNAME / BLOK_PASSWORD when service == \"blok\".
+    Optional BLOK_BASE_URL is handled by callers (worker / live snapshot).
     """
     if service == "blok":
-        # Lazy import / env — cloud VM has no Keychain; optional .env only
-        import os
+        # Cloud VM has no Keychain; optional .env only. Prefer Keychain when present.
+        load_dotenv()
 
         env_user = os.environ.get("BLOK_USERNAME", "").strip()
         env_pass = os.environ.get("BLOK_PASSWORD", "").strip()
