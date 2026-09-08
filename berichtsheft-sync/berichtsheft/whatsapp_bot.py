@@ -11,7 +11,6 @@ import httpx
 
 from berichtsheft.config_loader import ROOT, load_dotenv
 from berichtsheft.telegram_bot import (
-    BTN_AI,
     BTN_AUDIT,
     BTN_FOTO,
     BTN_HELP,

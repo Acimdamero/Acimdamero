@@ -16,6 +16,7 @@ __pycache__/
 venv/
 node_modules/
 output/
+logs/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/

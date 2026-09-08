@@ -18,6 +18,7 @@ from berichtsheft.blok_upload import upload_attachments_for_date
 from berichtsheft.blok_worker import run_worker
 from berichtsheft.config_loader import ROOT, load_config
 from berichtsheft.cursor_agent import is_available as cursor_available, run_agent_prompt
+from berichtsheft.whatsapp_bot import handle_incoming_text, parse_waha_webhook
 
 app = FastAPI(title="Berichtsheft-Sync API", version="0.3.0")
 
@@ -87,8 +88,6 @@ def health():
 @app.post("/waha/webhook")
 def whatsapp_webhook(payload: dict):
     """Terima event WAHA → balas lewat WhatsApp bot Berichtsheft."""
-    from berichtsheft.whatsapp_bot import handle_incoming_text, parse_waha_webhook
-
     parsed = parse_waha_webhook(payload)
     if not parsed:
         return {"ok": True, "ignored": True}
