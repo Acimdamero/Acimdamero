@@ -68,6 +68,24 @@ MENU_ACTIONS: dict[str, str] = {
 }
 
 
+BOT_COMMANDS = [
+    {"command": "start", "description": "Mulai + tampilkan menu tombol"},
+    {"command": "menu", "description": "Tampilkan lagi tombol keyboard"},
+    {"command": "help", "description": "Daftar perintah"},
+    {"command": "log", "description": "Catat kegiatan (teks setelah /log)"},
+    {"command": "selesai", "description": "Buat draft Berichtsheft"},
+    {"command": "status", "description": "Status hari ini"},
+    {"command": "ok", "description": "Setujui & isi BLok"},
+    {"command": "ubah", "description": "Koreksi draft (satu pesan)"},
+    {"command": "minggu", "description": "Cek gap minggu"},
+    {"command": "audit", "description": "Audit BLok lebih luas"},
+    {"command": "foto", "description": "Bantuan kirim foto"},
+    {"command": "lampiran", "description": "Daftar foto lampiran"},
+    {"command": "lampirkan", "description": "Upload lampiran ke BLok"},
+    {"command": "ai", "description": "Tanya Cursor agent"},
+]
+
+
 def _main_menu_keyboard() -> dict:
     """Reply keyboard — opsi sesuai perintah bot yang sudah ada."""
     return {
@@ -79,6 +97,7 @@ def _main_menu_keyboard() -> dict:
         ],
         "resize_keyboard": True,
         "is_persistent": True,
+        "input_field_placeholder": "Pilih menu atau ketik catatan…",
     }
 
 
@@ -88,14 +107,42 @@ def _send(
     text: str,
     *,
     reply_markup: dict | None = None,
+    with_menu: bool = True,
 ) -> None:
+    """Kirim pesan. Default: selalu sertakan keyboard menu agar UI HP ikut update."""
     payload: dict = {"chat_id": chat_id, "text": text[:4000]}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
+    elif with_menu:
+        payload["reply_markup"] = _main_menu_keyboard()
     httpx.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
         json=payload,
         timeout=30,
+    )
+
+
+def register_bot_commands(token: str) -> bool:
+    """Pasang daftar perintah di menu ☰ Telegram (setMyCommands)."""
+    r = httpx.post(
+        f"https://api.telegram.org/bot{token}/setMyCommands",
+        json={"commands": BOT_COMMANDS},
+        timeout=30,
+    )
+    data = r.json()
+    return bool(data.get("ok"))
+
+
+def push_menu_to_chat(token: str, chat_id: int) -> None:
+    """Paksa kirim ulang keyboard + daftar perintah ke chat."""
+    register_bot_commands(token)
+    _send(
+        token,
+        chat_id,
+        "☰ Menu Berichtsheft diperbarui.\n"
+        "Tombol di bawah chat siap dipakai.\n"
+        "Atau ketuk ☰ di samping kolom ketik.",
+        reply_markup=_main_menu_keyboard(),
     )
 
 
@@ -553,6 +600,20 @@ def run_polling() -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         raise SystemExit("TELEGRAM_BOT_TOKEN kosong di .env")
+
+    if register_bot_commands(token):
+        print("✓ setMyCommands — menu ☰ Telegram terpasang")
+    else:
+        print("⚠ setMyCommands gagal (bot tetap jalan)")
+
+    # Jika pernah /start sebelumnya, paksa refresh keyboard sekarang
+    saved = _saved_chat_id()
+    if saved:
+        try:
+            push_menu_to_chat(token, saved)
+            print(f"✓ Menu dikirim ulang ke chat_id={saved}")
+        except Exception as e:
+            print(f"⚠ Gagal push menu ke chat tersimpan: {e}")
 
     rem = _reminder_config()
     interval = max(1, rem["interval_hours"]) * 3600

@@ -56,7 +56,19 @@ Mac harus online; API di `127.0.0.1:8765`.
 
 ## Menu tombol (Reply Keyboard)
 
-Setelah `/start` atau `/menu`, keyboard tetap di bawah chat:
+Setelah `/start` atau `/menu`, keyboard tetap di bawah chat.
+
+**Kalau tombol belum muncul:** bot lama masih jalan. Di Mac:
+
+```bash
+cd ~/Projects/berichtsheft-sync   # atau folder salinan Anda
+git pull
+./scripts/run_local.sh
+# atau:
+python3 -m berichtsheft menu-push
+```
+
+Lalu di HP kirim `/start` atau `/menu`.
 
 | Tombol | Aksi |
 |--------|------|
@@ -74,6 +86,17 @@ Setelah `/start` atau `/menu`, keyboard tetap di bawah chat:
 | ☰ Menu | Tampilkan lagi keyboard + bantuan |
 
 Label tombol bisa diubah nanti di `berichtsheft/telegram_bot.py` (`BTN_*` + `MENU_ACTIONS`).
+
+### Jalankan lokal (satu perintah)
+
+```bash
+cd berichtsheft-sync
+# isi TELEGRAM_BOT_TOKEN di .env
+chmod +x scripts/run_local.sh
+./scripts/run_local.sh
+```
+
+Ini menjalankan API + bot, memasang menu ☰, dan mengirim ulang keyboard ke chat terakhir.
 
 ## Perintah
 
