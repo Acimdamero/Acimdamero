@@ -295,6 +295,34 @@ def cmd_telegram_check(_: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_menu_push(_: argparse.Namespace) -> int:
+    """Paksa refresh menu ☰ + keyboard ke chat Telegram terakhir."""
+    from berichtsheft.config_loader import load_dotenv
+    from berichtsheft.telegram_bot import (
+        _saved_chat_id,
+        push_menu_to_chat,
+        register_bot_commands,
+    )
+
+    load_dotenv()
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        print("✗ TELEGRAM_BOT_TOKEN kosong di .env")
+        return 1
+    if register_bot_commands(token):
+        print("✓ setMyCommands OK")
+    else:
+        print("⚠ setMyCommands gagal")
+    chat_id = _saved_chat_id()
+    if not chat_id:
+        print("⚠ Belum ada chat_id tersimpan. Kirim /start dulu di Telegram, lalu ulang:")
+        print("  python3 -m berichtsheft menu-push")
+        return 0
+    push_menu_to_chat(token, chat_id)
+    print(f"✓ Menu dikirim ke chat_id={chat_id} — cek HP sekarang")
+    return 0
+
+
 def cmd_telegram_init(_: argparse.Namespace) -> int:
     from berichtsheft.telegram_setup import ensure_env_file
 
@@ -488,6 +516,10 @@ def main() -> int:
     sub.add_parser("telegram-check", help="uji token + API").set_defaults(
         func=cmd_telegram_check
     )
+    sub.add_parser(
+        "menu-push",
+        help="paksa refresh tombol menu + daftar perintah di Telegram",
+    ).set_defaults(func=cmd_menu_push)
     sub.add_parser("gemini-check", help="uji Gemini API key").set_defaults(
         func=cmd_gemini_check
     )
