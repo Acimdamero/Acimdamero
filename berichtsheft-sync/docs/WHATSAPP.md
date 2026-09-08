@@ -25,47 +25,73 @@ Menu di WA dikirim sebagai **teks bernomor** (WhatsApp tidak punya ReplyKeyboard
 
 ---
 
-## Setup (Mac)
+## Cloud Agent vs Mac
 
-### 1. Jalankan WAHA
+WAHA = Docker + scan QR Linked Devices. **Cloud Agent VM biasanya tidak punya Docker/WAHA** (port `3000` mati). Di cloud kita hanya bisa:
+
+- tulis `WHATSAPP_ALLOWED_NUMBER` di `.env` (gitignored)
+- jalankan API `serve` di `:8765`
+- **tidak** bisa `wa-bot` / `wa-menu-push` sampai WAHA hidup di Mac Anda
+
+Jalankan langkah di bawah **di Mac** (satu kali pair QR, lalu bot lokal).
+
+---
+
+## Setup (Mac) — copy-paste
+
+### 1. Jalankan WAHA + scan QR
 
 ```bash
 cd mac-iphone-automation   # atau path repo hub Anda
 docker compose -f docker/docker-compose.waha.yml up -d
 ```
 
-Buka http://localhost:3000 → scan QR (WhatsApp → Linked Devices).
+1. Buka http://localhost:3000 (dashboard WAHA)
+2. Login dashboard jika diminta (`WAHA_DASHBOARD_*` di compose)
+3. iPhone → WhatsApp → **Linked Devices** → **Link a Device** → scan QR
+4. Tunggu session status `WORKING`
 
 ### 2. Isi `.env` di berichtsheft-sync
 
 ```bash
 cd berichtsheft-sync
-cp .env.example .env   # jika belum
+cp -n .env.example .env   # jika belum ada
 ```
 
+Edit `.env` (nomor tanpa `+` / spasi, format `628…` — contoh `6281234567890`):
+
 ```
-WHATSAPP_ALLOWED_NUMBER=
+WHATSAPP_ALLOWED_NUMBER=628…
 WAHA_BASE_URL=http://127.0.0.1:3000
 WAHA_SESSION=default
 WAHA_API_KEY=change-me-in-production
 BERICHTSHEFT_API=http://127.0.0.1:8765
 ```
 
-Isi `WHATSAPP_ALLOWED_NUMBER` dengan nomor WhatsApp Anda (tanpa `+`, contoh `628…`).
+Jangan commit `.env`. Cloud Agent menulis nomor Anda ke `.env` lokal (gitignored); di Mac salin nilai yang sama.
 
 ### 3. Jalankan API + bot WA
 
 **Terminal A:**
 ```bash
+cd berichtsheft-sync
 python3 -m berichtsheft serve
 ```
 
 **Terminal B:**
 ```bash
+cd berichtsheft-sync
 python3 -m berichtsheft wa-bot
 ```
 
-Cek:
+Atau satu runner:
+
+```bash
+./scripts/run_local.sh whatsapp
+```
+
+Cek + kirim menu ke `628…@c.us` (dari `WHATSAPP_ALLOWED_NUMBER`):
+
 ```bash
 python3 -m berichtsheft wa-check
 python3 -m berichtsheft wa-menu-push

@@ -354,6 +354,13 @@ def cmd_wa_menu_push(_: argparse.Namespace) -> int:
     except SystemExit as e:
         print(f"✗ {e}")
         return 1
+    except Exception as e:
+        print(f"✗ wa-menu-push gagal: {e}")
+        print(
+            "  Pastikan WAHA jalan di Mac (Docker :3000), session WORKING, "
+            "lalu ulangi. Lihat docs/WHATSAPP.md"
+        )
+        return 1
     return 0
 
 
