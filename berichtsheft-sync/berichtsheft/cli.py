@@ -219,8 +219,16 @@ def cmd_serve(args: argparse.Namespace) -> int:
     if args.port:
         port = args.port
     print(f"API http://{host}:{port}")
+    print(f"Dashboard http://{host}:{port}/dashboard")
     uvicorn.run("berichtsheft.api_server:app", host=host, port=port, reload=False)
     return 0
+
+
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """Start API server and print dashboard URL (same as serve)."""
+    print("Berichtsheft ops dashboard di-host oleh API server.")
+    print("Docs: docs/DASHBOARD.md")
+    return cmd_serve(args)
 
 
 def cmd_bot(_: argparse.Namespace) -> int:
@@ -546,9 +554,16 @@ def main() -> int:
     p_test.add_argument("--service", default="blok")
     p_test.set_defaults(func=cmd_credentials_test)
 
-    p_srv = sub.add_parser("serve", help="API server")
+    p_srv = sub.add_parser("serve", help="API server + /dashboard")
     p_srv.add_argument("--port", type=int)
     p_srv.set_defaults(func=cmd_serve)
+
+    p_dash = sub.add_parser(
+        "dashboard",
+        help="jalankan API + buka /dashboard (sama seperti serve)",
+    )
+    p_dash.add_argument("--port", type=int)
+    p_dash.set_defaults(func=cmd_dashboard)
 
     sub.add_parser("bot", help="Telegram polling").set_defaults(func=cmd_bot)
     sub.add_parser("telegram-init", help="buat .env + panduan BotFather").set_defaults(

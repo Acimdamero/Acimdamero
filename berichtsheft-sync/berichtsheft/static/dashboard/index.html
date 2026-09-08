@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Berichtsheft Ops</title>
+  <link rel="stylesheet" href="/dashboard/static/style.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">BH</span>
+        <div>
+          <strong>Berichtsheft</strong>
+          <small>Ops Console</small>
+        </div>
+      </div>
+      <nav id="nav">
+        <button type="button" data-panel="overview" class="active">Overview</button>
+        <button type="button" data-panel="live">Live feed</button>
+        <button type="button" data-panel="katalog">Katalog / Abteilung</button>
+        <button type="button" data-panel="shifts">Jadwal / Shifts</button>
+        <button type="button" data-panel="school">Sekolah / Templates</button>
+        <button type="button" data-panel="blok">BLok dry-run</button>
+        <button type="button" data-panel="bots">Bots</button>
+      </nav>
+      <footer class="sidebar-foot">
+        <label class="token-row">Token
+          <input id="dash-token" type="password" placeholder="DASHBOARD_TOKEN" autocomplete="off" />
+        </label>
+        <button type="button" id="btn-refresh" class="ghost">Refresh</button>
+      </footer>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h1 id="panel-title">Overview</h1>
+        <div id="status-pill" class="pill muted">…</div>
+      </header>
+
+      <section id="panel-overview" class="panel active">
+        <div id="health-grid" class="grid cards"></div>
+        <p class="hint" id="auth-note"></p>
+      </section>
+
+      <section id="panel-live" class="panel">
+        <div class="split3">
+          <div>
+            <h2>Work logs</h2>
+            <div id="live-logs" class="feed"></div>
+          </div>
+          <div>
+            <h2>Drafts</h2>
+            <div id="live-drafts" class="feed"></div>
+          </div>
+          <div>
+            <h2>Attachments</h2>
+            <div id="live-atts" class="feed"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-katalog" class="panel">
+        <div class="toolbar">
+          <p class="hint">Edit <code>data/katalog_abteilung.json</code> — Save menulis file + sync SQLite.</p>
+          <div class="actions">
+            <button type="button" id="btn-cat-reload">Reload</button>
+            <button type="button" id="btn-cat-save" class="primary">Save + Sync DB</button>
+          </div>
+        </div>
+        <textarea id="katalog-editor" spellcheck="false"></textarea>
+        <pre id="katalog-msg" class="msg"></pre>
+      </section>
+
+      <section id="panel-shifts" class="panel">
+        <div class="tabs">
+          <button type="button" class="tab active" data-shift-tab="table">SQLite shifts</button>
+          <button type="button" class="tab" data-shift-tab="json">Sample JSON</button>
+        </div>
+        <div id="shifts-table-wrap">
+          <div class="toolbar">
+            <button type="button" id="btn-shift-reload">Reload</button>
+          </div>
+          <div class="table-wrap">
+            <table id="shifts-table">
+              <thead>
+                <tr>
+                  <th>Date</th><th>Type</th><th>Start</th><th>End</th><th>Tags</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <details class="editor-box">
+            <summary>Upsert shift</summary>
+            <div class="form-grid">
+              <label>Date <input id="sh-date" type="date" /></label>
+              <label>Type
+                <select id="sh-type">
+                  <option value="arbeit">arbeit</option>
+                  <option value="frei">frei</option>
+                  <option value="schule">schule</option>
+                </select>
+              </label>
+              <label>Start <input id="sh-start" type="time" /></label>
+              <label>End <input id="sh-end" type="time" /></label>
+              <label class="span2">Tags (comma) <input id="sh-tags" placeholder="BRF, FS2" /></label>
+            </div>
+            <button type="button" id="btn-shift-save" class="primary">Upsert</button>
+            <pre id="shift-msg" class="msg"></pre>
+          </details>
+        </div>
+        <div id="shifts-json-wrap" class="hidden">
+          <div class="toolbar">
+            <p class="hint">File: <code>data/shifts_kw23_24.json</code></p>
+            <div class="actions">
+              <button type="button" id="btn-sj-reload">Reload</button>
+              <button type="button" id="btn-sj-save" class="primary">Save + Import DB</button>
+            </div>
+          </div>
+          <textarea id="shifts-json-editor" spellcheck="false"></textarea>
+          <pre id="sj-msg" class="msg"></pre>
+        </div>
+      </section>
+
+      <section id="panel-school" class="panel">
+        <div id="school-content"></div>
+      </section>
+
+      <section id="panel-blok" class="panel">
+        <div class="banner warn">
+          <strong>dry-run / offline</strong>
+          <span>Live BLok login tidak dijalankan di cloud (Keychain Mac-only). Preview = output worker terakhir.</span>
+        </div>
+        <div id="blok-meta" class="meta"></div>
+        <div id="blok-files" class="file-list"></div>
+        <iframe id="blok-iframe" title="BLok dry-run preview" class="blok-frame hidden"></iframe>
+        <pre id="blok-json" class="msg hidden"></pre>
+      </section>
+
+      <section id="panel-bots" class="panel">
+        <div class="split2">
+          <div id="bot-telegram" class="card"></div>
+          <div id="bot-whatsapp" class="card"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/dashboard/static/app.js"></script>
+</body>
+</html>

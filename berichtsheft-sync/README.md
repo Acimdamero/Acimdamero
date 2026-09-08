@@ -12,6 +12,7 @@ Sistem **semi-otomatis** untuk mengisi **Berichtsheft** (BLok) bagi Azubi **Hote
 |-------|-----------|
 | **Telegram bot** | `/log`, `/selesai`, `/ok`, `/ubah`, `/status`, `/minggu`, `/audit` |
 | **WhatsApp bot** | Nomor personal via WAHA — menu bernomor + perintah sama seperti Telegram |
+| **Ops dashboard** | Monitoring + edit katalog/jadwal di browser — [docs/DASHBOARD.md](docs/DASHBOARD.md) |
 | **Gemini Vision** | Kirim foto (jadwal EdTime, kegiatan, berufsschule) → teks Jerman |
 | **Orkestrator** | Gabung log harian + shift + template → draft Berichtsheft |
 | **BLok worker** | Dry-run (HTML) dan **live** (Playwright + Keychain) |
@@ -53,6 +54,7 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
 | [docs/BLok_LIVE.md](docs/BLok_LIVE.md) | Panduan isi BLok live |
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Setup bot Telegram |
 | [docs/WHATSAPP.md](docs/WHATSAPP.md) | **Setup bot WhatsApp (WAHA + nomor personal)** |
+| [docs/DASHBOARD.md](docs/DASHBOARD.md) | **Ops dashboard — monitor + edit katalog/jadwal** |
 | [docs/GEMINI.md](docs/GEMINI.md) | Setup Gemini API |
 
 ---
@@ -92,6 +94,15 @@ python3 -m berichtsheft catalog --code BRF
 # atau: python3 -m berichtsheft catalog --reload --write-md
 ```
 
+### Ops dashboard
+
+```bash
+python3 -m berichtsheft serve          # atau: python3 -m berichtsheft dashboard
+# buka http://127.0.0.1:8765/dashboard
+```
+
+Edit katalog / jadwal dari UI — lihat [docs/DASHBOARD.md](docs/DASHBOARD.md).
+
 ### Operasi harian
 
 1. Import jadwal EdTime (JSON) — mingguan
@@ -114,6 +125,7 @@ berichtsheft-sync/
 │   ├── telegram_bot.py # Bot Telegram
 │   ├── whatsapp_bot.py # Bot WhatsApp (WAHA)
 │   ├── api_server.py   # REST API lokal (+ webhook WA)
+│   ├── dashboard.py    # Ops dashboard /dashboard
 │   ├── orchestrator.py # Gabung log → draft
 │   ├── blok_worker.py  # Playwright BLok
 │   └── ...

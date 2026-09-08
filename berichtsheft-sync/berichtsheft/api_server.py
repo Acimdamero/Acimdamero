@@ -18,11 +18,14 @@ from berichtsheft.blok_upload import upload_attachments_for_date
 from berichtsheft.blok_worker import run_worker
 from berichtsheft.config_loader import ROOT, load_config
 from berichtsheft.cursor_agent import is_available as cursor_available, run_agent_prompt
+from berichtsheft.dashboard import mount_dashboard
 from berichtsheft.whatsapp_bot import handle_incoming_text, parse_waha_webhook
 
-app = FastAPI(title="Berichtsheft-Sync API", version="0.3.0")
+app = FastAPI(title="Berichtsheft-Sync API", version="0.4.0")
 
 ATTACHMENTS_DIR = ROOT / "data" / "attachments"
+
+mount_dashboard(app)
 
 
 class LogBody(BaseModel):
