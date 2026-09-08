@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import shutil
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static" / "dashboard"
 BLOK_DRY_RUN = ROOT / "output" / "blok_dry_run"
 SHIFTS_SAMPLE = ROOT / "data" / "shifts_kw23_24.json"
 ATTACHMENTS_DIR = ROOT / "data" / "attachments"
+COOKIE_NAME = "bh_dashboard_token"
 
 router = APIRouter(tags=["dashboard"])
 
@@ -55,19 +57,82 @@ def _dashboard_token() -> str:
     return os.environ.get("DASHBOARD_TOKEN", "").strip()
 
 
+def _tokens_match(provided: str, expected: str) -> bool:
+    if not provided or not expected:
+        return False
+    a = provided.encode("utf-8")
+    b = expected.encode("utf-8")
+    if len(a) != len(b):
+        return False
+    return hmac.compare_digest(a, b)
+
+
+def _token_from_authorization(authorization: Optional[str]) -> str:
+    if not authorization:
+        return ""
+    parts = authorization.strip().split(None, 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    return ""
+
+
+def _provided_dashboard_token(
+    request: Request,
+    *,
+    x_dashboard_token: Optional[str] = None,
+    token: Optional[str] = None,
+    dashboard_token: Optional[str] = None,
+    authorization: Optional[str] = None,
+) -> str:
+    """Resolve token from header, Bearer, query, or cookie (first match)."""
+    for candidate in (
+        (x_dashboard_token or "").strip(),
+        _token_from_authorization(authorization),
+        (token or "").strip(),
+        (dashboard_token or "").strip(),
+        (request.cookies.get(COOKIE_NAME) or "").strip(),
+    ):
+        if candidate:
+            return candidate
+    return ""
+
+
 def require_dashboard_access(
     request: Request,
     x_dashboard_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
     token: Optional[str] = Query(default=None),
+    dashboard_token: Optional[str] = Query(default=None, alias="DASHBOARD_TOKEN"),
 ) -> None:
-    """If DASHBOARD_TOKEN set, require matching header/query. Else allow (local ops)."""
+    """If DASHBOARD_TOKEN set, require matching header/query/cookie. Else allow (local ops)."""
     expected = _dashboard_token()
     if not expected:
         return
-    provided = (x_dashboard_token or token or "").strip()
-    if provided != expected:
-        raise HTTPException(401, "Dashboard token required (X-Dashboard-Token or ?token=)")
+    provided = _provided_dashboard_token(
+        request,
+        x_dashboard_token=x_dashboard_token,
+        token=token,
+        dashboard_token=dashboard_token,
+        authorization=authorization,
+    )
+    if not _tokens_match(provided, expected):
+        raise HTTPException(
+            401,
+            "Dashboard token required "
+            "(Authorization: Bearer, X-Dashboard-Token, ?token=, or cookie)",
+        )
 
+
+def _set_dashboard_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # True once always behind HTTPS tunnel/proxy
+        max_age=60 * 60 * 24 * 30,
+        path="/dashboard",
+    )
 
 def _conn():
     conn = db.connect()
@@ -111,11 +176,30 @@ def _safe_under(base: Path, name: str) -> Path:
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
-def dashboard_page(_: None = Depends(require_dashboard_access)):
+def dashboard_page(
+    request: Request,
+    _: None = Depends(require_dashboard_access),
+    token: Optional[str] = Query(default=None),
+    dashboard_token: Optional[str] = Query(default=None, alias="DASHBOARD_TOKEN"),
+    authorization: Optional[str] = Header(default=None),
+    x_dashboard_token: Optional[str] = Header(default=None),
+):
     index = STATIC_DIR / "index.html"
     if not index.is_file():
         raise HTTPException(500, "dashboard static missing")
-    return HTMLResponse(index.read_text(encoding="utf-8"))
+    response = HTMLResponse(index.read_text(encoding="utf-8"))
+    expected = _dashboard_token()
+    if expected:
+        provided = _provided_dashboard_token(
+            request,
+            x_dashboard_token=x_dashboard_token,
+            token=token,
+            dashboard_token=dashboard_token,
+            authorization=authorization,
+        )
+        if _tokens_match(provided, expected):
+            _set_dashboard_cookie(response, expected)
+    return response
 
 
 @router.get("/dashboard/blok-preview/{filename}")
@@ -192,7 +276,8 @@ def dashboard_health(_: None = Depends(require_dashboard_access)):
         "db_path": str(Path(db.DEFAULT_DB).name),
         "server": {"host": server.get("host", "127.0.0.1"), "port": server.get("port", 8765)},
         "auth_note": (
-            "DASHBOARD_TOKEN set — send X-Dashboard-Token"
+            "DASHBOARD_TOKEN set — use ?token=, Authorization: Bearer, "
+            "X-Dashboard-Token, or cookie bh_dashboard_token"
             if dash_token_set
             else "DASHBOARD_TOKEN empty — open access (use localhost / private network only)"
         ),

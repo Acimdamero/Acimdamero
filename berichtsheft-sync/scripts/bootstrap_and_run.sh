@@ -17,6 +17,8 @@ python3 - <<'PY'
 from pathlib import Path
 import os
 
+import secrets
+
 path = Path(".env")
 lines = path.read_text(encoding="utf-8").splitlines()
 keys = [
@@ -28,6 +30,7 @@ keys = [
     "WAHA_API_KEY",
     "BERICHTSHEFT_API",
     "GEMINI_API_KEY",
+    "DASHBOARD_TOKEN",
 ]
 found = {k: os.environ.get(k, "").strip() for k in keys}
 out = []
@@ -43,6 +46,26 @@ for line in lines:
 for k, v in found.items():
     if v and k not in seen:
         out.append(f"{k}={v}")
+# Ensure DASHBOARD_TOKEN for remote / phone access
+existing_dash = ""
+for line in out:
+    if line.startswith("DASHBOARD_TOKEN="):
+        existing_dash = line.split("=", 1)[1].strip()
+        break
+if not existing_dash and not found.get("DASHBOARD_TOKEN"):
+    generated = secrets.token_urlsafe(32)
+    if any(line.startswith("DASHBOARD_TOKEN=") for line in out):
+        out = [
+            f"DASHBOARD_TOKEN={generated}" if line.startswith("DASHBOARD_TOKEN=") else line
+            for line in out
+        ]
+    else:
+        out.append("")
+        out.append("# Ops dashboard auth (auto-generated; do not commit)")
+        out.append(f"DASHBOARD_TOKEN={generated}")
+    print("DASHBOARD_TOKEN_GENERATED=yes")
+else:
+    print("DASHBOARD_TOKEN_GENERATED=no")
 path.write_text("\n".join(out) + "\n", encoding="utf-8")
 token = found.get("TELEGRAM_BOT_TOKEN") or ""
 # juga baca dari file jika secret belum di env tapi sudah di .env

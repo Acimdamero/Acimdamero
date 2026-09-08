@@ -98,7 +98,8 @@ python3 -m berichtsheft catalog --code BRF
 
 ```bash
 python3 -m berichtsheft serve          # atau: python3 -m berichtsheft dashboard
-# buka http://127.0.0.1:8765/dashboard
+# lokal: http://127.0.0.1:8765/dashboard
+# HP / remote: set DASHBOARD_TOKEN + tunnel — lihat docs/DASHBOARD.md
 ```
 
 Edit katalog / jadwal dari UI — lihat [docs/DASHBOARD.md](docs/DASHBOARD.md).

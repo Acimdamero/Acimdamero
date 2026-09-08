@@ -13,7 +13,15 @@
   const statusPill = document.getElementById("status-pill");
   const panelTitle = document.getElementById("panel-title");
 
-  tokenInput.value = localStorage.getItem("bh_dash_token") || "";
+  // Prefer ?token= / ?DASHBOARD_TOKEN= from phone-friendly share URL, then localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlToken = (urlParams.get("token") || urlParams.get("DASHBOARD_TOKEN") || "").trim();
+  if (urlToken) {
+    tokenInput.value = urlToken;
+    localStorage.setItem("bh_dash_token", urlToken);
+  } else {
+    tokenInput.value = localStorage.getItem("bh_dash_token") || "";
+  }
   tokenInput.addEventListener("change", () => {
     localStorage.setItem("bh_dash_token", tokenInput.value.trim());
   });
@@ -22,7 +30,10 @@
     const h = {};
     if (json) h["Content-Type"] = "application/json";
     const t = tokenInput.value.trim();
-    if (t) h["X-Dashboard-Token"] = t;
+    if (t) {
+      h["X-Dashboard-Token"] = t;
+      h["Authorization"] = `Bearer ${t}`;
+    }
     return h;
   }
 

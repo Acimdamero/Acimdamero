@@ -18,8 +18,11 @@ from berichtsheft.api_server import app
 class TestDashboard(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
-        # Ensure empty token for open access in tests
-        os.environ.pop("DASHBOARD_TOKEN", None)
+        # Empty token = open access in tests (setdefault in load_dotenv won't override)
+        os.environ["DASHBOARD_TOKEN"] = ""
+
+    def tearDown(self) -> None:
+        os.environ["DASHBOARD_TOKEN"] = ""
 
     def test_health_json(self) -> None:
         r = self.client.get("/dashboard/api/health")
@@ -104,8 +107,23 @@ class TestDashboard(unittest.TestCase):
                 headers={"X-Dashboard-Token": "secret-test"},
             )
             self.assertEqual(r2.status_code, 200)
+            r3 = self.client.get(
+                "/dashboard/api/health",
+                headers={"Authorization": "Bearer secret-test"},
+            )
+            self.assertEqual(r3.status_code, 200)
+            r4 = self.client.get("/dashboard/api/health?token=secret-test")
+            self.assertEqual(r4.status_code, 200)
+            page = self.client.get("/dashboard?token=secret-test")
+            self.assertEqual(page.status_code, 200)
+            self.assertIn("bh_dashboard_token", page.cookies)
+            r5 = self.client.get(
+                "/dashboard/api/health",
+                cookies={"bh_dashboard_token": "secret-test"},
+            )
+            self.assertEqual(r5.status_code, 200)
         finally:
-            os.environ.pop("DASHBOARD_TOKEN", None)
+            os.environ["DASHBOARD_TOKEN"] = ""
 
 
 if __name__ == "__main__":
