@@ -125,6 +125,21 @@ class TestDashboard(unittest.TestCase):
         finally:
             os.environ["DASHBOARD_TOKEN"] = ""
 
+    def test_blok_live_panel_reports_iframe_blocked(self) -> None:
+        r = self.client.get("/dashboard/api/blok")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["iframe_allowed"])
+        self.assertEqual(data["embed_mode"], "external_link")
+        self.assertIn("frame-ancestors", data.get("iframe_blocked_reason") or "")
+        self.assertTrue(str(data.get("login_url", "")).endswith("/blok/login"))
+        self.assertIn("credentials", data)
+        self.assertFalse(data.get("proxy", {}).get("enabled", True))
+        page = self.client.get("/dashboard")
+        self.assertIn("BLok Live", page.text)
+        self.assertIn("Buka BLok", page.text)
+
 
 if __name__ == "__main__":
     unittest.main()

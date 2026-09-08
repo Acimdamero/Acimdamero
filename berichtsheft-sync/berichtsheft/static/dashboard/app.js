@@ -5,7 +5,7 @@
     katalog: "Katalog / Abteilung",
     shifts: "Jadwal / Shifts",
     school: "Sekolah / Templates",
-    blok: "BLok dry-run",
+    blok: "BLok Live",
     bots: "Bots",
   };
 
@@ -318,12 +318,46 @@
 
   async function loadBlok() {
     const data = await api("/dashboard/api/blok");
+    const banner = document.getElementById("blok-banner");
+    const blocked = !data.iframe_allowed;
+    banner.className = "banner " + (blocked ? "warn" : "ok");
+    banner.innerHTML = `
+      <strong>${esc(data.ui_label || data.mode)}</strong>
+      <span>${esc(data.note || "")}</span>
+      ${
+        data.iframe_blocked_reason
+          ? `<span class="meta">CSP: ${esc(data.iframe_blocked_reason)}</span>`
+          : ""
+      }`;
+
+    const openBtn = document.getElementById("blok-open-btn");
+    openBtn.href = data.login_url || data.blok_url || openBtn.href;
+    document.getElementById("blok-cta-hint").textContent = blocked
+      ? "iframe diblokir — buka akun BLok Anda di tab baru."
+      : "Embed iframe aktif; tombol cadangan tetap tersedia.";
+
+    const creds = data.credentials || {};
+    const cells = [
+      ["Embed mode", data.embed_mode || "—", data.embed_mode === "iframe"],
+      ["Iframe allowed", data.iframe_allowed, data.iframe_allowed],
+      ["Live creds", creds.credential_resolvable, creds.credential_resolvable],
+      ["Creds source", creds.source || "none", creds.source && creds.source !== "none"],
+      ["Keychain", Boolean(data.keychain_available), Boolean(data.keychain_available)],
+      ["Proxy", data.proxy && data.proxy.enabled, false],
+    ];
+    document.getElementById("blok-status-grid").innerHTML = cells
+      .map(([label, val, ok]) => {
+        const display =
+          typeof val === "boolean" ? (val ? "yes" : "no") : String(val ?? "—");
+        return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${ok ? "ok" : "bad"}">${esc(display)}</div></div>`;
+      })
+      .join("");
+
     document.getElementById("blok-meta").innerHTML = `
       Mode: <strong>${esc(data.mode)}</strong> ·
-      Keychain: ${data.keychain_available ? "yes" : "no"} ·
-      <a href="${esc(data.blok_url)}" target="_blank" rel="noopener" style="color:var(--accent)">online-ausbildungsnachweis.de</a><br/>
+      <a href="${esc(data.login_url || data.blok_url)}" target="_blank" rel="noopener" style="color:var(--accent)">blok/login</a><br/>
       Docs: ${(data.docs || []).map((d) => `<code>${esc(d)}</code>`).join(" ")}<br/>
-      ${esc(data.note)}`;
+      ${data.proxy && data.proxy.reason ? esc(data.proxy.reason) : ""}`;
 
     const list = document.getElementById("blok-files");
     list.innerHTML = (data.files || [])
@@ -333,28 +367,54 @@
       )
       .join("") || '<span class="hint">Belum ada file di output/blok_dry_run/</span>';
 
+    const shots = document.getElementById("blok-shots");
+    shots.innerHTML = (data.live_screenshots || [])
+      .map(
+        (f) =>
+          `<button type="button" data-url="${esc(f.preview_url)}" data-kind="image">${esc(f.name)}</button>`
+      )
+      .join("") ||
+      (creds.credential_resolvable
+        ? '<span class="hint">Belum ada screenshot live (*_live.png). Jalankan worker --live di Mac / dengan env.</span>'
+        : '<span class="hint">Screenshot live membutuhkan BLOK_USERNAME/BLOK_PASSWORD di .env atau Keychain — belum di-set.</span>');
+
     const iframe = document.getElementById("blok-iframe");
     const pre = document.getElementById("blok-json");
-    list.querySelectorAll("button[data-url]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        if (btn.dataset.kind === "html") {
-          iframe.classList.remove("hidden");
-          pre.classList.add("hidden");
-          iframe.src = btn.dataset.url;
-        } else {
-          iframe.classList.add("hidden");
-          pre.classList.remove("hidden");
-          const res = await fetch(btn.dataset.url, { headers: headers() });
-          pre.textContent = await res.text();
-        }
-      });
-    });
+    const shotImg = document.getElementById("blok-shot-img");
 
-    const firstHtml = (data.files || []).find((f) => f.kind === "html");
-    if (firstHtml) {
-      iframe.classList.remove("hidden");
-      iframe.src = firstHtml.preview_url;
+    function showPreview(url, kind) {
+      if (kind === "html") {
+        iframe.classList.remove("hidden");
+        pre.classList.add("hidden");
+        shotImg.classList.add("hidden");
+        iframe.src = url;
+      } else if (kind === "image") {
+        iframe.classList.add("hidden");
+        pre.classList.add("hidden");
+        shotImg.classList.remove("hidden");
+        shotImg.src = url;
+      } else {
+        iframe.classList.add("hidden");
+        shotImg.classList.add("hidden");
+        pre.classList.remove("hidden");
+        fetch(url, { headers: headers() })
+          .then((r) => r.text())
+          .then((t) => {
+            pre.textContent = t;
+          });
+      }
     }
+
+    [...list.querySelectorAll("button[data-url]"), ...shots.querySelectorAll("button[data-url]")].forEach(
+      (btn) => {
+        btn.addEventListener("click", () => showPreview(btn.dataset.url, btn.dataset.kind));
+      }
+    );
+
+    const firstShot = (data.live_screenshots || [])[0];
+    const firstHtml = (data.files || []).find((f) => f.kind === "html");
+    if (firstShot) showPreview(firstShot.preview_url, "image");
+    else if (firstHtml) showPreview(firstHtml.preview_url, "html");
   }
 
   async function loadBots() {

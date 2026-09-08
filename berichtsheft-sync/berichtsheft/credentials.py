@@ -68,6 +68,21 @@ def set_credential(service: str, username: str, password: str) -> None:
 
 
 def get_credential(service: str) -> tuple[str, str] | None:
+    """Resolve credentials: Keychain (Mac) → local secrets → env (cloud).
+
+    Env fallback (never commit): BLOK_USERNAME / BLOK_PASSWORD when service == \"blok\".
+    """
+    if service == "blok":
+        # Lazy import / env — cloud VM has no Keychain; optional .env only
+        import os
+
+        env_user = os.environ.get("BLOK_USERNAME", "").strip()
+        env_pass = os.environ.get("BLOK_PASSWORD", "").strip()
+        # Prefer Keychain/secrets below; env used if those miss — checked after
+        env_pair = (env_user, env_pass) if env_user and env_pass else None
+    else:
+        env_pair = None
+
     if _keychain_available():
         try:
             user_proc = subprocess.run(
@@ -83,37 +98,40 @@ def get_credential(service: str) -> tuple[str, str] | None:
                 check=False,
             )
             if user_proc.returncode != 0:
-                return None
-            password = user_proc.stdout.strip()
-            account_proc = subprocess.run(
-                [
-                    "security",
-                    "find-generic-password",
-                    "-s",
-                    _service_name(service),
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            account = ""
-            for line in account_proc.stdout.splitlines():
-                if '"acct"' in line or "acct" in line:
-                    part = line.split("=")[-1].strip().strip('"')
-                    account = part
-                    break
-            if not account:
-                account = "blok-user"
-            return account, password
+                pass  # fall through to secrets / env
+            else:
+                password = user_proc.stdout.strip()
+                account_proc = subprocess.run(
+                    [
+                        "security",
+                        "find-generic-password",
+                        "-s",
+                        _service_name(service),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                account = ""
+                for line in account_proc.stdout.splitlines():
+                    if '"acct"' in line or "acct" in line:
+                        part = line.split("=")[-1].strip().strip('"')
+                        account = part
+                        break
+                if not account:
+                    account = "blok-user"
+                return account, password
         except subprocess.CalledProcessError:
-            return None
+            pass  # fall through to secrets / env
 
-    if not SECRETS_FILE.exists():
-        return None
-    for line in SECRETS_FILE.read_text().splitlines():
-        if line.startswith(f"{service}:"):
-            _, user, pwd = line.split(":", 2)
-            return user, pwd
+    if SECRETS_FILE.exists():
+        for line in SECRETS_FILE.read_text().splitlines():
+            if line.startswith(f"{service}:"):
+                _, user, pwd = line.split(":", 2)
+                return user, pwd
+
+    if env_pair:
+        return env_pair
     return None
 
 

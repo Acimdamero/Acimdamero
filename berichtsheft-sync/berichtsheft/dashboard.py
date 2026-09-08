@@ -207,7 +207,19 @@ def blok_preview(filename: str, _: None = Depends(require_dashboard_access)):
     path = _safe_under(BLOK_DRY_RUN, filename)
     if not path.is_file():
         raise HTTPException(404, "dry-run file tidak ada")
-    media = "text/html" if path.suffix == ".html" else "application/json"
+    suffix = path.suffix.lower()
+    if suffix == ".html":
+        media = "text/html"
+    elif suffix == ".json":
+        media = "application/json"
+    elif suffix == ".png":
+        media = "image/png"
+    elif suffix in (".jpg", ".jpeg"):
+        media = "image/jpeg"
+    elif suffix == ".webp":
+        media = "image/webp"
+    else:
+        media = "application/octet-stream"
     return FileResponse(path, media_type=media)
 
 
@@ -479,41 +491,134 @@ def dashboard_school(_: None = Depends(require_dashboard_access)):
     }
 
 
-# ── BLok dry-run ────────────────────────────────────────────────────────────
+# ── BLok Live (+ dry-run outputs) ───────────────────────────────────────────
+
+# Verified via curl -I (2026-09): CSP frame-ancestors restricts embedding.
+BLOK_LOGIN_URL = "https://www.online-ausbildungsnachweis.de/blok/login"
+BLOK_BASE_URL = "https://www.online-ausbildungsnachweis.de"
+BLOK_FRAME_ANCESTORS = "'self' https://mls.mobil-lernen.com https://mls2.de"
+BLOK_IFRAME_ALLOWED = False  # our dashboard origin is not in frame-ancestors
+
+
+def _blok_credential_status() -> dict[str, Any]:
+    """Report credential presence only — never return secrets."""
+    load_dotenv()
+    env_user = bool(os.environ.get("BLOK_USERNAME", "").strip())
+    env_pass = bool(os.environ.get("BLOK_PASSWORD", "").strip())
+    keychain_cli = shutil.which("security") is not None
+    from berichtsheft import credentials as cred_mod
+
+    keychain_platform = cred_mod._keychain_available()  # noqa: SLF001
+    secrets_file = cred_mod.SECRETS_FILE.is_file()
+    stored = False
+    try:
+        stored = cred_mod.get_credential("blok") is not None
+    except Exception:  # noqa: BLE001
+        stored = False
+
+    source = "none"
+    if env_user and env_pass:
+        source = "env"
+    elif stored and keychain_platform:
+        source = "keychain"
+    elif stored:
+        source = "secrets_file"
+
+    return {
+        "env_username_present": env_user,
+        "env_password_present": env_pass,
+        "keychain_cli_present": keychain_cli,
+        "keychain_platform": keychain_platform,
+        "secrets_file_present": secrets_file,
+        "credential_resolvable": stored or (env_user and env_pass),
+        "source": source,
+    }
 
 
 @router.get("/dashboard/api/blok")
 def dashboard_blok(_: None = Depends(require_dashboard_access)):
     files = []
+    live_shots = []
     if BLOK_DRY_RUN.is_dir():
         for p in sorted(BLOK_DRY_RUN.iterdir(), reverse=True):
-            if p.suffix not in (".html", ".json"):
-                continue
-            files.append(
-                {
-                    "name": p.name,
-                    "size": p.stat().st_size,
-                    "preview_url": f"/dashboard/blok-preview/{p.name}",
-                    "kind": p.suffix.lstrip("."),
-                }
-            )
-    keychain = shutil.which("security") is not None  # macOS Keychain CLI
+            if p.suffix in (".html", ".json"):
+                files.append(
+                    {
+                        "name": p.name,
+                        "size": p.stat().st_size,
+                        "preview_url": f"/dashboard/blok-preview/{p.name}",
+                        "kind": p.suffix.lstrip("."),
+                    }
+                )
+            elif p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp") and "live" in p.name.lower():
+                live_shots.append(
+                    {
+                        "name": p.name,
+                        "size": p.stat().st_size,
+                        "preview_url": f"/dashboard/blok-preview/{p.name}",
+                        "kind": "image",
+                    }
+                )
+
+    creds = _blok_credential_status()
+    # Best available embed strategy given CSP + credential availability
+    if BLOK_IFRAME_ALLOWED:
+        embed_mode = "iframe"
+    elif live_shots and creds["credential_resolvable"]:
+        embed_mode = "screenshot"
+    else:
+        embed_mode = "external_link"
+
+    live_available = creds["credential_resolvable"]  # worker --live possible if set
+    note_parts = [
+        "BLok menolak iframe di dashboard kita (CSP frame-ancestors hanya MLS).",
+        "Gunakan tombol Buka BLok (tab baru) untuk login interaktif.",
+        "Panel ini menampilkan status + dry-run worker — bukan sesi BLok hidup di dalam frame.",
+    ]
+    if not creds["credential_resolvable"]:
+        note_parts.append(
+            "Kredensial belum ada di env/Keychain. Untuk live screenshot/worker di cloud: "
+            "set BLOK_USERNAME + BLOK_PASSWORD di .env (jangan commit), atau Keychain di Mac."
+        )
+    elif creds["source"] == "env":
+        note_parts.append("Kredensial terdeteksi dari env (nilai tidak ditampilkan).")
+
     return {
         "ok": True,
-        "mode": "dry-run / offline",
-        "live_available": False,
-        "keychain_available": keychain,
-        "blok_url": "https://www.online-ausbildungsnachweis.de",
+        "mode": "live-panel / dry-run outputs",
+        "embed_mode": embed_mode,
+        "iframe_allowed": BLOK_IFRAME_ALLOWED,
+        "iframe_blocked_reason": (
+            f"content-security-policy: frame-ancestors {BLOK_FRAME_ANCESTORS}"
+            if not BLOK_IFRAME_ALLOWED
+            else None
+        ),
+        "live_available": live_available,
+        "credentials": creds,
+        "keychain_available": creds["keychain_cli_present"] and creds["keychain_platform"],
+        "blok_url": BLOK_BASE_URL,
+        "login_url": BLOK_LOGIN_URL,
+        "proxy": {
+            "enabled": False,
+            "reason": (
+                "Reverse-proxy ke /blok/login tidak dipakai: session cookie Path=/blok "
+                "Secure SameSite=None akan rusak / tidak ikut auth jika di-rewrite ke host kita."
+            ),
+        },
         "docs": [
+            "docs/DASHBOARD.md",
             "docs/BLok_LIVE.md",
             "docs/BLok_AUTOMATION.md",
             "docs/BLok_WOCHE.md",
         ],
         "dry_run_dir": "output/blok_dry_run/",
         "files": files,
-        "note": (
-            "Live BLok login butuh Keychain (Mac). Di cloud/VM ini panel menampilkan "
-            "hasil dry-run terakhir saja — tidak scrape kredensial."
+        "live_screenshots": live_shots,
+        "note": " ".join(note_parts),
+        "ui_label": (
+            "iframe diblokir oleh BLok — buka di tab baru"
+            if not BLOK_IFRAME_ALLOWED
+            else "iframe tersedia"
         ),
     }
 

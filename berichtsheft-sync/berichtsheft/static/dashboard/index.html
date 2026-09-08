@@ -22,7 +22,7 @@
         <button type="button" data-panel="katalog">Katalog / Abteilung</button>
         <button type="button" data-panel="shifts">Jadwal / Shifts</button>
         <button type="button" data-panel="school">Sekolah / Templates</button>
-        <button type="button" data-panel="blok">BLok dry-run</button>
+        <button type="button" data-panel="blok">BLok Live</button>
         <button type="button" data-panel="bots">Bots</button>
       </nav>
       <footer class="sidebar-foot">
@@ -129,13 +129,23 @@
       </section>
 
       <section id="panel-blok" class="panel">
-        <div class="banner warn">
-          <strong>dry-run / offline</strong>
-          <span>Live BLok login tidak dijalankan di cloud (Keychain Mac-only). Preview = output worker terakhir.</span>
+        <div id="blok-banner" class="banner warn">
+          <strong>Memuat status BLok…</strong>
+          <span>Cek CSP / kredensial dari API.</span>
         </div>
+        <div class="blok-cta-row">
+          <a id="blok-open-btn" class="cta-blok" href="https://www.online-ausbildungsnachweis.de/blok/login" target="_blank" rel="noopener noreferrer">
+            Buka BLok
+          </a>
+          <span id="blok-cta-hint" class="hint">Login resmi di tab baru (iframe biasanya diblokir situs BLok).</span>
+        </div>
+        <div id="blok-status-grid" class="grid cards" style="margin: 1rem 0"></div>
         <div id="blok-meta" class="meta"></div>
+        <h2 class="blok-section-title">Dry-run / worker output</h2>
         <div id="blok-files" class="file-list"></div>
+        <div id="blok-shots" class="file-list"></div>
         <iframe id="blok-iframe" title="BLok dry-run preview" class="blok-frame hidden"></iframe>
+        <img id="blok-shot-img" class="blok-shot hidden" alt="BLok live screenshot" />
         <pre id="blok-json" class="msg hidden"></pre>
       </section>
 

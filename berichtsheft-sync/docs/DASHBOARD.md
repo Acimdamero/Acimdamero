@@ -76,8 +76,36 @@ Jika `DASHBOARD_TOKEN` **kosong**, dashboard terbuka tanpa auth — **hanya** un
 | **Katalog / Abteilung** | Editor JSON untuk `data/katalog_abteilung.json` → Save menulis file + `catalog.sync_to_db` + export legacy |
 | **Jadwal / Shifts** | Tabel SQLite shifts (upsert/delete) + editor sample `data/shifts_kw23_24.json` (save + import DB) |
 | **Sekolah / Templates** | Baca Abteilung Schule dari katalog + template texts |
-| **BLok dry-run** | Status offline/dry-run; iframe HTML / JSON dari `output/blok_dry_run/` (tidak login live BLok di cloud) |
+| **BLok Live** | Tombol **Buka BLok** (tab baru ke `/blok/login`); status CSP/iframe; dry-run HTML/JSON + screenshot live jika ada. **Bukan** sesi BLok interaktif di dalam iframe (situs memblokir frame) |
 | **Bots** | Telegram/WhatsApp: chat id tersimpan?, daftar perintah, link docs |
+
+## BLok di dalam dashboard — batasan penting
+
+`curl -I https://www.online-ausbildungsnachweis.de/blok/login` mengembalikan:
+
+```text
+content-security-policy: frame-ancestors 'self' https://mls.mobil-lernen.com https://mls2.de
+```
+
+Artinya browser **menolak** embed login BLok di iframe dashboard kita (origin kita tidak ada di daftar). Panel **BLok Live** jujur soal ini (`iframe_allowed: false`) dan mengarahkan ke:
+
+1. **Buka BLok** → `https://www.online-ausbildungsnachweis.de/blok/login` (tab baru) — cara interaktif yang didukung
+2. Preview **dry-run** dari `output/blok_dry_run/` (HTML/JSON worker)
+3. Screenshot live (`*_live.png`) hanya jika worker `--live` pernah jalan (Mac Keychain atau `BLOK_USERNAME`/`BLOK_PASSWORD` di `.env` — **jangan commit**)
+
+**Tidak** dipakai: reverse-proxy ke halaman login BLok (cookie `JSESSIONID` Path=`/blok`, Secure, SameSite=None akan rusak / tidak autentik di host kita).
+
+Akses **dashboard** dari HP lewat tunnel (cloudflared / localtunnel) **tetap jalan** — itu URL kita, bukan iframe BLok. Buka BLok tetap di browser HP lewat tombol tab baru.
+
+Kredensial cloud (opsional, rahasia):
+
+```bash
+# .env — jangan commit
+BLOK_USERNAME=...
+BLOK_PASSWORD=...
+```
+
+Tanpa itu, panel tetap menampilkan dry-run + tombol Buka BLok; live screenshot/worker tidak dijalankan otomatis.
 
 ## Edit katalog dari UI
 
@@ -113,6 +141,7 @@ Semua di bawah `/dashboard/api/…` (auth sama seperti di atas):
 ## Keamanan
 
 - Jangan commit `.env`, token, Gemini keys, atau `berichtsheft.db`
-- Live BLok credentials tetap di macOS Keychain — dashboard cloud hanya menampilkan dry-run
+- Live BLok credentials: macOS Keychain **atau** opsional `BLOK_USERNAME`/`BLOK_PASSWORD` di `.env` (cloud) — **jangan** commit password
 - Akses publik (tunnel / VPS): **selalu** isi `DASHBOARD_TOKEN`; jangan expose tanpa auth
 - Rotate token jika URL+token pernah tersebar di chat/screenshot
+- Jangan mengira iframe BLok “rusak” — CSP situs mereka memang memblokir embed di luar MLS
