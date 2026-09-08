@@ -22,6 +22,21 @@ def load_katalog(path: Path | None = None) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def save_katalog(data: dict[str, Any], path: Path | None = None) -> Path:
+    """Persist katalog JSON (pretty-printed). Caller should sync_to_db afterwards."""
+    path = path or KATALOG_PATH
+    if not isinstance(data, dict):
+        raise ValueError("katalog must be a JSON object")
+    if "abteilungen" not in data or not isinstance(data["abteilungen"], list):
+        raise ValueError("katalog harus punya key 'abteilungen' (list)")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def iter_codes(katalog: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Flat list of code entries with parent abteilung metadata."""
     katalog = katalog or load_katalog()

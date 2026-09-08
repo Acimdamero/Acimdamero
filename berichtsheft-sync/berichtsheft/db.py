@@ -10,8 +10,9 @@ from typing import Any
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "berichtsheft.db"
 
 
-def connect(db_path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(db_path))
+def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
+    path = DEFAULT_DB if db_path is None else db_path
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -215,6 +216,48 @@ def work_logs_for_date(conn: sqlite3.Connection, date: str) -> list[sqlite3.Row]
             (date,),
         )
     )
+
+
+def recent_work_logs(conn: sqlite3.Connection, limit: int = 30) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM work_logs ORDER BY created_at DESC, id DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def recent_drafts(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM draft_entries ORDER BY generated_at DESC, id DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def recent_attachments(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM attachments ORDER BY created_at DESC, id DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def list_shifts(conn: sqlite3.Connection, limit: int = 200) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM shifts ORDER BY date DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def delete_shift(conn: sqlite3.Connection, date: str) -> bool:
+    cur = conn.execute("DELETE FROM shifts WHERE date = ?", (date,))
+    conn.commit()
+    return cur.rowcount > 0
 
 
 def set_approval(

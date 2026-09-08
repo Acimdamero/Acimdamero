@@ -18,10 +18,14 @@ from berichtsheft.blok_upload import upload_attachments_for_date
 from berichtsheft.blok_worker import run_worker
 from berichtsheft.config_loader import ROOT, load_config
 from berichtsheft.cursor_agent import is_available as cursor_available, run_agent_prompt
+from berichtsheft.dashboard import mount_dashboard
+from berichtsheft.whatsapp_bot import handle_incoming_text, parse_waha_webhook
 
-app = FastAPI(title="Berichtsheft-Sync API", version="0.3.0")
+app = FastAPI(title="Berichtsheft-Sync API", version="0.4.0")
 
 ATTACHMENTS_DIR = ROOT / "data" / "attachments"
+
+mount_dashboard(app)
 
 
 class LogBody(BaseModel):
@@ -81,6 +85,20 @@ def health():
         "vision": is_vision_enabled(),
         "cursor": cursor_available(),
     }
+
+
+@app.post("/whatsapp/webhook")
+@app.post("/waha/webhook")
+def whatsapp_webhook(payload: dict):
+    """Terima event WAHA → balas lewat WhatsApp bot Berichtsheft."""
+    parsed = parse_waha_webhook(payload)
+    if not parsed:
+        return {"ok": True, "ignored": True}
+    chat_id, text, from_me = parsed
+    if from_me:
+        return {"ok": True, "ignored": "from_me"}
+    handle_incoming_text(chat_id, text, from_me=False)
+    return {"ok": True}
 
 
 @app.get("/catalog")
