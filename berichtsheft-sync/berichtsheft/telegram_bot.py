@@ -38,11 +38,111 @@ def _saved_chat_id() -> int | None:
         return None
 
 
-def _send(token: str, chat_id: int, text: str) -> None:
+# Tombol menu utama (boleh diedit label nanti; map di MENU_ACTIONS)
+BTN_LOG = "📝 Log"
+BTN_SELESAI = "✅ Selesai"
+BTN_STATUS = "📊 Status"
+BTN_OK = "👍 OK"
+BTN_MINGGU = "📅 Minggu"
+BTN_AUDIT = "🔍 Audit"
+BTN_FOTO = "📷 Foto"
+BTN_LAMPIRAN = "📎 Lampiran"
+BTN_UBAH = "✏️ Ubah"
+BTN_AI = "🤖 AI"
+BTN_HELP = "❓ Help"
+BTN_MENU = "☰ Menu"
+
+MENU_ACTIONS: dict[str, str] = {
+    BTN_LOG: "__prompt_log__",
+    BTN_SELESAI: "/selesai",
+    BTN_STATUS: "/status",
+    BTN_OK: "/ok",
+    BTN_MINGGU: "/minggu",
+    BTN_AUDIT: "/audit",
+    BTN_FOTO: "/foto",
+    BTN_LAMPIRAN: "/lampiran",
+    BTN_UBAH: "__prompt_ubah__",
+    BTN_AI: "__prompt_ai__",
+    BTN_HELP: "/help",
+    BTN_MENU: "/menu",
+}
+
+
+BOT_COMMANDS = [
+    {"command": "start", "description": "Mulai + tampilkan menu tombol"},
+    {"command": "menu", "description": "Tampilkan lagi tombol keyboard"},
+    {"command": "help", "description": "Daftar perintah"},
+    {"command": "log", "description": "Catat kegiatan (teks setelah /log)"},
+    {"command": "selesai", "description": "Buat draft Berichtsheft"},
+    {"command": "status", "description": "Status hari ini"},
+    {"command": "ok", "description": "Setujui & isi BLok"},
+    {"command": "ubah", "description": "Koreksi draft (satu pesan)"},
+    {"command": "minggu", "description": "Cek gap minggu"},
+    {"command": "audit", "description": "Audit BLok lebih luas"},
+    {"command": "foto", "description": "Bantuan kirim foto"},
+    {"command": "lampiran", "description": "Daftar foto lampiran"},
+    {"command": "lampirkan", "description": "Upload lampiran ke BLok"},
+    {"command": "ai", "description": "Tanya Cursor agent"},
+]
+
+
+def _main_menu_keyboard() -> dict:
+    """Reply keyboard — opsi sesuai perintah bot yang sudah ada."""
+    return {
+        "keyboard": [
+            [{"text": BTN_LOG}, {"text": BTN_SELESAI}, {"text": BTN_STATUS}],
+            [{"text": BTN_OK}, {"text": BTN_MINGGU}, {"text": BTN_AUDIT}],
+            [{"text": BTN_FOTO}, {"text": BTN_LAMPIRAN}, {"text": BTN_UBAH}],
+            [{"text": BTN_AI}, {"text": BTN_HELP}, {"text": BTN_MENU}],
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True,
+        "input_field_placeholder": "Pilih menu atau ketik catatan…",
+    }
+
+
+def _send(
+    token: str,
+    chat_id: int,
+    text: str,
+    *,
+    reply_markup: dict | None = None,
+    with_menu: bool = True,
+) -> None:
+    """Kirim pesan. Default: selalu sertakan keyboard menu agar UI HP ikut update."""
+    payload: dict = {"chat_id": chat_id, "text": text[:4000]}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    elif with_menu:
+        payload["reply_markup"] = _main_menu_keyboard()
     httpx.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
-        json={"chat_id": chat_id, "text": text[:4000]},
+        json=payload,
         timeout=30,
+    )
+
+
+def register_bot_commands(token: str) -> bool:
+    """Pasang daftar perintah di menu ☰ Telegram (setMyCommands)."""
+    r = httpx.post(
+        f"https://api.telegram.org/bot{token}/setMyCommands",
+        json={"commands": BOT_COMMANDS},
+        timeout=30,
+    )
+    data = r.json()
+    return bool(data.get("ok"))
+
+
+def push_menu_to_chat(token: str, chat_id: int) -> None:
+    """Paksa kirim ulang keyboard + daftar perintah ke chat."""
+    register_bot_commands(token)
+    _send(
+        token,
+        chat_id,
+        "☰ Menu Berichtsheft diperbarui.\n"
+        "Tombol di bawah chat siap dipakai.\n"
+        "Atau ketuk ☰ di samping kolom ketik.",
+        reply_markup=_main_menu_keyboard(),
     )
 
 
@@ -156,9 +256,11 @@ def _help_text(user_id: int) -> str:
     )
     return (
         "Berichtsheft-Sync\n\n"
+        "☰ Pakai tombol menu di bawah chat, atau ketik perintah.\n\n"
         "📝 Log kerja:\n"
         "• Kirim teks biasa = log\n"
-        "• /log … — catatan eksplisit\n\n"
+        "• /log … — catatan eksplisit\n"
+        f"• Tombol {BTN_LOG} — minta Anda kirim teks\n\n"
         "📷 Foto (Gemini Vision):\n"
         "• Kirim foto + caption (stichpunkte, berufsschule, edtime, lampiran)\n"
         "• /foto — bantuan foto\n\n"
@@ -177,8 +279,41 @@ def _help_text(user_id: int) -> str:
         "• /audit — scan lebih luas (kosong, draft, foto)\n"
         "  Bot mengingatkan otomatis jika ada yang kurang\n\n"
         "🤖 Cursor: /ai perintah … (1–5 menit)\n"
+        "• /menu — tampilkan lagi tombol keyboard\n"
         + uid_hint
     )
+
+
+def _resolve_menu_text(text: str) -> str | None:
+    """Map label tombol → perintah atau aksi khusus. None = bukan tombol menu."""
+    return MENU_ACTIONS.get(text.strip())
+
+
+def _prompt_for(token: str, chat_id: int, kind: str) -> None:
+    if kind == "__prompt_log__":
+        _send(
+            token,
+            chat_id,
+            "📝 Kirim teks kegiatan sekarang (satu pesan).\n"
+            "Contoh: Buffet auffüllen und Gäste begrüßen",
+        )
+    elif kind == "__prompt_ubah__":
+        _send(
+            token,
+            chat_id,
+            "✏️ Koreksi harus satu pesan dengan /ubah …\n\n"
+            "Contoh:\n"
+            "/ubah Bitte formell auf Deutsch mit Hotelfachbegriffen",
+        )
+    elif kind == "__prompt_ai__":
+        _send(
+            token,
+            chat_id,
+            "🤖 Format: /ai perintah Anda\n\n"
+            "Contoh:\n/ai ringkas log hari ini ke Stichpunkte DE",
+        )
+    else:
+        _send(token, chat_id, "Perintah tidak dikenal. /help")
 
 
 def _format_lampiran(data: dict) -> str:
@@ -211,8 +346,13 @@ def _handle_command(token: str, chat_id: int, user_id: int, text: str) -> None:
     arg = text.strip()[len(parts[0]) :].strip() if len(parts) > 1 else ""
 
     with httpx.Client(base_url=API_BASE, timeout=60) as client:
-        if cmd in ("/start", "/help"):
-            _send(token, chat_id, _help_text(user_id))
+        if cmd in ("/start", "/help", "/menu"):
+            _send(
+                token,
+                chat_id,
+                _help_text(user_id),
+                reply_markup=_main_menu_keyboard(),
+            )
         elif cmd == "/foto":
             _send(
                 token,
@@ -461,6 +601,20 @@ def run_polling() -> None:
     if not token:
         raise SystemExit("TELEGRAM_BOT_TOKEN kosong di .env")
 
+    if register_bot_commands(token):
+        print("✓ setMyCommands — menu ☰ Telegram terpasang")
+    else:
+        print("⚠ setMyCommands gagal (bot tetap jalan)")
+
+    # Jika pernah /start sebelumnya, paksa refresh keyboard sekarang
+    saved = _saved_chat_id()
+    if saved:
+        try:
+            push_menu_to_chat(token, saved)
+            print(f"✓ Menu dikirim ulang ke chat_id={saved}")
+        except Exception as e:
+            print(f"⚠ Gagal push menu ke chat tersimpan: {e}")
+
     rem = _reminder_config()
     interval = max(1, rem["interval_hours"]) * 3600
     last_reminder = 0.0
@@ -507,6 +661,18 @@ def run_polling() -> None:
 
                 if not text:
                     continue
+
+                action = _resolve_menu_text(text)
+                if action == "/menu":
+                    _handle_command(token, cid, uid, "/menu")
+                    continue
+                if action and action.startswith("__prompt_"):
+                    _prompt_for(token, cid, action)
+                    continue
+                if action and action.startswith("/"):
+                    _handle_command(token, cid, uid, action)
+                    continue
+
                 if text.startswith("/"):
                     _handle_command(token, cid, uid, text)
                 else:

@@ -1,0 +1,770 @@
+"""Ops dashboard — health, live feed, editors for katalog / shifts / school."""
+
+from __future__ import annotations
+
+import hmac
+import json
+import os
+import shutil
+from pathlib import Path
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from berichtsheft import catalog, credentials as cred_mod, db
+from berichtsheft.ai_gemini import is_enabled as gemini_enabled
+from berichtsheft.ai_vision import is_vision_enabled
+from berichtsheft.blok_live_snapshot import (
+    LATEST_PNG as BLOK_LIVE_PNG,
+    read_latest_meta,
+    take_live_snapshot,
+)
+from berichtsheft.config_loader import ROOT, load_config, load_dotenv
+from berichtsheft.cursor_agent import is_available as cursor_available
+from berichtsheft.seed import load_shifts
+
+STATIC_DIR = Path(__file__).resolve().parent / "static" / "dashboard"
+BLOK_DRY_RUN = ROOT / "output" / "blok_dry_run"
+BLOK_LIVE_DIR = ROOT / "output" / "blok_live"
+SHIFTS_SAMPLE = ROOT / "data" / "shifts_kw23_24.json"
+ATTACHMENTS_DIR = ROOT / "data" / "attachments"
+COOKIE_NAME = "bh_dashboard_token"
+
+router = APIRouter(tags=["dashboard"])
+
+
+class CatalogSaveBody(BaseModel):
+    katalog: dict[str, Any]
+    sync_db: bool = True
+    write_md: bool = False
+    export_legacy: bool = True
+
+
+class ShiftBody(BaseModel):
+    date: str
+    day_type: str = "arbeit"
+    start: Optional[str] = None
+    end: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    segments: list[dict[str, Any]] = Field(default_factory=list)
+    source: str = "dashboard"
+
+
+class ShiftsJsonBody(BaseModel):
+    data: dict[str, Any]
+    import_to_db: bool = True
+
+
+def _dashboard_token() -> str:
+    load_dotenv()
+    return os.environ.get("DASHBOARD_TOKEN", "").strip()
+
+
+def _tokens_match(provided: str, expected: str) -> bool:
+    if not provided or not expected:
+        return False
+    a = provided.encode("utf-8")
+    b = expected.encode("utf-8")
+    if len(a) != len(b):
+        return False
+    return hmac.compare_digest(a, b)
+
+
+def _token_from_authorization(authorization: Optional[str]) -> str:
+    if not authorization:
+        return ""
+    parts = authorization.strip().split(None, 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    return ""
+
+
+def _provided_dashboard_token(
+    request: Request,
+    *,
+    x_dashboard_token: Optional[str] = None,
+    token: Optional[str] = None,
+    dashboard_token: Optional[str] = None,
+    authorization: Optional[str] = None,
+) -> str:
+    """Resolve token from header, Bearer, query, or cookie (first match)."""
+    for candidate in (
+        (x_dashboard_token or "").strip(),
+        _token_from_authorization(authorization),
+        (token or "").strip(),
+        (dashboard_token or "").strip(),
+        (request.cookies.get(COOKIE_NAME) or "").strip(),
+    ):
+        if candidate:
+            return candidate
+    return ""
+
+
+def require_dashboard_access(
+    request: Request,
+    x_dashboard_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+    dashboard_token: Optional[str] = Query(default=None, alias="DASHBOARD_TOKEN"),
+) -> None:
+    """If DASHBOARD_TOKEN set, require matching header/query/cookie. Else allow (local ops)."""
+    expected = _dashboard_token()
+    if not expected:
+        return
+    provided = _provided_dashboard_token(
+        request,
+        x_dashboard_token=x_dashboard_token,
+        token=token,
+        dashboard_token=dashboard_token,
+        authorization=authorization,
+    )
+    if not _tokens_match(provided, expected):
+        raise HTTPException(
+            401,
+            "Dashboard token required "
+            "(Authorization: Bearer, X-Dashboard-Token, ?token=, or cookie)",
+        )
+
+
+def _set_dashboard_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # True once always behind HTTPS tunnel/proxy
+        max_age=60 * 60 * 24 * 30,
+        path="/dashboard",
+    )
+
+def _conn():
+    conn = db.connect()
+    db.init_schema(conn)
+    return conn
+
+
+def _row_to_dict(row) -> dict[str, Any]:
+    return {k: row[k] for k in row.keys()}
+
+
+def _attachment_exists(rel_path: str) -> bool:
+    if not rel_path:
+        return False
+    p = (ROOT / rel_path).resolve()
+    try:
+        p.relative_to(ROOT.resolve())
+    except ValueError:
+        return False
+    return p.is_file()
+
+
+def _rel(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _safe_under(base: Path, name: str) -> Path:
+    """Resolve path under base; reject traversal."""
+    target = (base / name).resolve()
+    try:
+        target.relative_to(base.resolve())
+    except ValueError as e:
+        raise HTTPException(400, "path tidak valid") from e
+    return target
+
+
+# ── Pages & static ──────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(
+    request: Request,
+    _: None = Depends(require_dashboard_access),
+    token: Optional[str] = Query(default=None),
+    dashboard_token: Optional[str] = Query(default=None, alias="DASHBOARD_TOKEN"),
+    authorization: Optional[str] = Header(default=None),
+    x_dashboard_token: Optional[str] = Header(default=None),
+):
+    index = STATIC_DIR / "index.html"
+    if not index.is_file():
+        raise HTTPException(500, "dashboard static missing")
+    response = HTMLResponse(index.read_text(encoding="utf-8"))
+    expected = _dashboard_token()
+    if expected:
+        provided = _provided_dashboard_token(
+            request,
+            x_dashboard_token=x_dashboard_token,
+            token=token,
+            dashboard_token=dashboard_token,
+            authorization=authorization,
+        )
+        if _tokens_match(provided, expected):
+            _set_dashboard_cookie(response, expected)
+    return response
+
+
+@router.get("/dashboard/blok-preview/{filename}")
+def blok_preview(filename: str, _: None = Depends(require_dashboard_access)):
+    path = _safe_under(BLOK_DRY_RUN, filename)
+    if not path.is_file():
+        raise HTTPException(404, "dry-run file tidak ada")
+    suffix = path.suffix.lower()
+    if suffix == ".html":
+        media = "text/html"
+    elif suffix == ".json":
+        media = "application/json"
+    elif suffix == ".png":
+        media = "image/png"
+    elif suffix in (".jpg", ".jpeg"):
+        media = "image/jpeg"
+    elif suffix == ".webp":
+        media = "image/webp"
+    else:
+        media = "application/octet-stream"
+    return FileResponse(path, media_type=media)
+
+
+@router.get("/dashboard/blok-live/{filename}")
+def blok_live_file(filename: str, _: None = Depends(require_dashboard_access)):
+    """Serve screenshots / meta from output/blok_live/ (latest.png, meta.json)."""
+    path = _safe_under(BLOK_LIVE_DIR, filename)
+    if not path.is_file():
+        raise HTTPException(404, "blok live file tidak ada")
+    suffix = path.suffix.lower()
+    if suffix == ".png":
+        media = "image/png"
+    elif suffix == ".json":
+        media = "application/json"
+    elif suffix in (".jpg", ".jpeg"):
+        media = "image/jpeg"
+    elif suffix == ".webp":
+        media = "image/webp"
+    else:
+        media = "application/octet-stream"
+    return FileResponse(path, media_type=media)
+
+
+@router.get("/dashboard/media/{path:path}")
+def media_file(path: str, _: None = Depends(require_dashboard_access)):
+    """Serve attachment files under data/attachments (thumbnails)."""
+    # Allow either "2026-06-05/foo.jpg" or full "data/attachments/..."
+    rel = path
+    if rel.startswith("data/attachments/"):
+        file_path = _safe_under(ROOT, rel)
+    else:
+        file_path = _safe_under(ATTACHMENTS_DIR, rel)
+    if not file_path.is_file():
+        raise HTTPException(404, "file tidak ada")
+    return FileResponse(file_path)
+
+
+# ── Health / overview ───────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/health")
+def dashboard_health(_: None = Depends(require_dashboard_access)):
+    load_dotenv()
+    tg_token = bool(os.environ.get("TELEGRAM_BOT_TOKEN", "").strip())
+    wa_allowed = bool(os.environ.get("WHATSAPP_ALLOWED_NUMBER", "").strip())
+    gemini_key = bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    dash_token_set = bool(_dashboard_token())
+
+    tg_chat = (ROOT / "data" / "telegram_chat_id.txt").is_file()
+    wa_chat = (ROOT / "data" / "whatsapp_chat_id.txt").is_file()
+
+    waha: dict[str, Any] = {"ok": False, "error": "not checked"}
+    try:
+        from berichtsheft.whatsapp_bot import check_waha
+
+        waha = check_waha()
+    except Exception as e:  # noqa: BLE001 — surface status only
+        waha = {"ok": False, "error": str(e)}
+
+    dry_runs = []
+    if BLOK_DRY_RUN.is_dir():
+        dry_runs = sorted(
+            [p.name for p in BLOK_DRY_RUN.iterdir() if p.suffix in (".html", ".json")],
+            reverse=True,
+        )[:20]
+
+    cfg = load_config()
+    server = cfg.get("server") or {}
+
+    return {
+        "ok": True,
+        "service": "berichtsheft-sync",
+        "api": True,
+        "gemini_key_present": gemini_key,
+        "gemini_enabled": gemini_enabled(),
+        "vision_enabled": is_vision_enabled(),
+        "cursor_available": cursor_available(),
+        "telegram_token_present": tg_token,
+        "telegram_chat_id_saved": tg_chat,
+        "whatsapp_allowlist_set": wa_allowed,
+        "whatsapp_chat_id_saved": wa_chat,
+        "waha": waha,
+        "dashboard_token_required": dash_token_set,
+        "blok_dry_run_files": dry_runs,
+        "katalog_path": _rel(catalog.KATALOG_PATH),
+        "db_path": str(Path(db.DEFAULT_DB).name),
+        "server": {"host": server.get("host", "127.0.0.1"), "port": server.get("port", 8765)},
+        "auth_note": (
+            "DASHBOARD_TOKEN set — use ?token=, Authorization: Bearer, "
+            "X-Dashboard-Token, or cookie bh_dashboard_token"
+            if dash_token_set
+            else "DASHBOARD_TOKEN empty — open access (use localhost / private network only)"
+        ),
+    }
+
+
+# ── Live feed ───────────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/live")
+def dashboard_live(
+    limit: int = Query(default=25, ge=1, le=100),
+    _: None = Depends(require_dashboard_access),
+):
+    conn = _conn()
+    logs = [_row_to_dict(r) for r in db.recent_work_logs(conn, limit)]
+    drafts = [_row_to_dict(r) for r in db.recent_drafts(conn, limit)]
+    atts = []
+    for r in db.recent_attachments(conn, limit):
+        item = _row_to_dict(r)
+        rel = item.get("path") or ""
+        item["file_exists"] = _attachment_exists(rel)
+        if item["file_exists"]:
+            # URL under /dashboard/media/
+            if rel.startswith("data/attachments/"):
+                item["media_url"] = "/dashboard/media/" + rel[len("data/attachments/") :]
+            else:
+                item["media_url"] = f"/dashboard/media/{rel}"
+        else:
+            item["media_url"] = None
+        atts.append(item)
+    conn.close()
+    return {"ok": True, "work_logs": logs, "drafts": drafts, "attachments": atts}
+
+
+# ── Catalog editor ──────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/catalog")
+def dashboard_get_catalog(_: None = Depends(require_dashboard_access)):
+    data = catalog.load_katalog()
+    return {"ok": True, "katalog": data, "path": _rel(catalog.KATALOG_PATH)}
+
+
+@router.put("/dashboard/api/catalog")
+def dashboard_put_catalog(
+    body: CatalogSaveBody,
+    _: None = Depends(require_dashboard_access),
+):
+    try:
+        path = catalog.save_katalog(body.katalog)
+    except (ValueError, TypeError, OSError) as e:
+        raise HTTPException(400, str(e)) from e
+
+    stats = None
+    if body.sync_db:
+        conn = _conn()
+        stats = catalog.sync_to_db(conn, body.katalog)
+        conn.close()
+    if body.export_legacy:
+        catalog.export_legacy_files(body.katalog)
+    md_path = None
+    if body.write_md:
+        md_path = _rel(catalog.write_docs_markdown(body.katalog))
+
+    return {
+        "ok": True,
+        "path": _rel(path),
+        "sync": stats,
+        "docs": md_path,
+    }
+
+
+# ── Shifts / jadwal ─────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/shifts")
+def dashboard_list_shifts(
+    limit: int = Query(default=100, ge=1, le=500),
+    _: None = Depends(require_dashboard_access),
+):
+    conn = _conn()
+    rows = []
+    for r in db.list_shifts(conn, limit):
+        item = _row_to_dict(r)
+        try:
+            item["tags"] = json.loads(item.pop("tags_json") or "[]")
+        except json.JSONDecodeError:
+            item["tags"] = []
+        try:
+            item["segments"] = json.loads(item.pop("segments_json") or "[]")
+        except json.JSONDecodeError:
+            item["segments"] = []
+        rows.append(item)
+    conn.close()
+    return {"ok": True, "shifts": rows}
+
+
+@router.put("/dashboard/api/shifts")
+def dashboard_upsert_shift(
+    body: ShiftBody,
+    _: None = Depends(require_dashboard_access),
+):
+    conn = _conn()
+    db.upsert_shift(
+        conn,
+        {
+            "date": body.date,
+            "day_type": body.day_type,
+            "start": body.start,
+            "end": body.end,
+            "tags": body.tags,
+            "segments": body.segments,
+            "source": body.source,
+        },
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "date": body.date}
+
+
+@router.delete("/dashboard/api/shifts/{date}")
+def dashboard_delete_shift(date: str, _: None = Depends(require_dashboard_access)):
+    conn = _conn()
+    ok = db.delete_shift(conn, date)
+    conn.close()
+    if not ok:
+        raise HTTPException(404, f"Shift tidak ada: {date}")
+    return {"ok": True, "deleted": date}
+
+
+@router.get("/dashboard/api/shifts/json")
+def dashboard_get_shifts_json(_: None = Depends(require_dashboard_access)):
+    if not SHIFTS_SAMPLE.is_file():
+        raise HTTPException(404, f"{SHIFTS_SAMPLE.name} tidak ada")
+    data = json.loads(SHIFTS_SAMPLE.read_text(encoding="utf-8"))
+    return {
+        "ok": True,
+        "path": _rel(SHIFTS_SAMPLE),
+        "data": data,
+    }
+
+
+@router.put("/dashboard/api/shifts/json")
+def dashboard_put_shifts_json(
+    body: ShiftsJsonBody,
+    _: None = Depends(require_dashboard_access),
+):
+    if "shifts" not in body.data or not isinstance(body.data["shifts"], list):
+        raise HTTPException(400, "JSON harus punya key 'shifts' (list)")
+    SHIFTS_SAMPLE.write_text(
+        json.dumps(body.data, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    imported = 0
+    if body.import_to_db:
+        conn = _conn()
+        imported = load_shifts(conn, SHIFTS_SAMPLE)
+        conn.close()
+    return {
+        "ok": True,
+        "path": _rel(SHIFTS_SAMPLE),
+        "imported": imported,
+    }
+
+
+# ── School / templates ──────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/school")
+def dashboard_school(_: None = Depends(require_dashboard_access)):
+    data = catalog.load_katalog()
+    school = [
+        a
+        for a in data.get("abteilungen", [])
+        if (a.get("blok_name") or "").lower() in ("schule", "school")
+        or any(
+            (c.get("code") or "").lower() == "schule" for c in (a.get("codes") or [])
+        )
+    ]
+    # also pull templates_hotelfach for Schule codes
+    templates_path = catalog.TEMPLATES_PATH
+    templates = []
+    if templates_path.is_file():
+        raw = json.loads(templates_path.read_text(encoding="utf-8"))
+        templates = [
+            t
+            for t in raw.get("templates", [])
+            if (t.get("code") or "").lower() == "schule"
+            or (t.get("department") or "").lower() in ("schule", "berufsschule")
+        ]
+    return {
+        "ok": True,
+        "abteilungen": school,
+        "templates_schule": templates,
+        "katalog_path": _rel(catalog.KATALOG_PATH),
+        "templates_path": _rel(templates_path),
+        "hint": "Edit materi sekolah lewat panel Katalog (Abteilung Schule) lalu Save + Sync DB.",
+    }
+
+
+# ── BLok Live (+ dry-run outputs) ───────────────────────────────────────────
+
+# Verified via curl -I (2026-09): CSP frame-ancestors restricts embedding.
+BLOK_LOGIN_URL = "https://www.online-ausbildungsnachweis.de/blok/login"
+BLOK_BASE_URL = "https://www.online-ausbildungsnachweis.de"
+BLOK_FRAME_ANCESTORS = "'self' https://mls.mobil-lernen.com https://mls2.de"
+BLOK_IFRAME_ALLOWED = False  # our dashboard origin is not in frame-ancestors
+
+
+def _blok_credential_status() -> dict[str, Any]:
+    """Report credential presence only — never return secrets."""
+    load_dotenv()
+    env_user = bool(os.environ.get("BLOK_USERNAME", "").strip())
+    env_pass = bool(os.environ.get("BLOK_PASSWORD", "").strip())
+    env_base = bool(os.environ.get("BLOK_BASE_URL", "").strip())
+    keychain_cli = shutil.which("security") is not None
+    keychain_platform = cred_mod._keychain_available()  # noqa: SLF001
+    secrets_file = cred_mod.SECRETS_FILE.is_file()
+    stored = False
+    try:
+        stored = cred_mod.get_credential("blok") is not None
+    except Exception:  # noqa: BLE001
+        stored = False
+
+    source = "none"
+    if env_user and env_pass:
+        source = "env"
+    elif stored and keychain_platform:
+        source = "keychain"
+    elif stored:
+        source = "secrets_file"
+
+    return {
+        "env_username_present": env_user,
+        "env_password_present": env_pass,
+        "env_base_url_present": env_base,
+        "keychain_cli_present": keychain_cli,
+        "keychain_platform": keychain_platform,
+        "secrets_file_present": secrets_file,
+        "credential_resolvable": stored or (env_user and env_pass),
+        "source": source,
+    }
+
+
+def _live_snapshot_summary() -> dict[str, Any]:
+    meta = read_latest_meta() or {}
+    has_png = BLOK_LIVE_PNG.is_file()
+    return {
+        "available": has_png or bool(meta),
+        "logged_in": bool(meta.get("logged_in")),
+        "status": meta.get("status"),
+        "error": meta.get("error"),
+        "taken_at": meta.get("taken_at"),
+        "image_url": "/dashboard/blok-live/latest.png" if has_png else None,
+        "meta": meta or None,
+    }
+
+
+@router.get("/dashboard/api/blok")
+def dashboard_blok(_: None = Depends(require_dashboard_access)):
+    files = []
+    live_shots = []
+    if BLOK_DRY_RUN.is_dir():
+        for p in sorted(BLOK_DRY_RUN.iterdir(), reverse=True):
+            if p.suffix in (".html", ".json"):
+                files.append(
+                    {
+                        "name": p.name,
+                        "size": p.stat().st_size,
+                        "preview_url": f"/dashboard/blok-preview/{p.name}",
+                        "kind": p.suffix.lstrip("."),
+                    }
+                )
+            elif p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp") and "live" in p.name.lower():
+                live_shots.append(
+                    {
+                        "name": p.name,
+                        "size": p.stat().st_size,
+                        "preview_url": f"/dashboard/blok-preview/{p.name}",
+                        "kind": "image",
+                    }
+                )
+
+    creds = _blok_credential_status()
+    live_snap = _live_snapshot_summary()
+    # Best available embed strategy given CSP + credential availability
+    if BLOK_IFRAME_ALLOWED:
+        embed_mode = "iframe"
+    elif live_snap.get("image_url") or (live_shots and creds["credential_resolvable"]):
+        embed_mode = "screenshot"
+    else:
+        embed_mode = "external_link"
+
+    live_available = creds["credential_resolvable"]  # worker --live / snapshot possible if set
+    note_parts = [
+        "BLok menolak iframe di dashboard kita (CSP frame-ancestors hanya MLS).",
+        "Gunakan tombol Buka BLok (tab baru) untuk login interaktif.",
+        "Atau Ambil snapshot live (Playwright login + screenshot) jika kredensial tersedia.",
+    ]
+    if not creds["credential_resolvable"]:
+        note_parts.append(
+            "Kredensial belum ada di env/Keychain. Untuk live snapshot di cloud: "
+            "set BLOK_USERNAME + BLOK_PASSWORD di .env (jangan commit), atau Keychain di Mac."
+        )
+    elif creds["source"] == "env":
+        note_parts.append("Kredensial terdeteksi dari env (nilai tidak ditampilkan).")
+
+    return {
+        "ok": True,
+        "mode": "live-panel / snapshot / dry-run outputs",
+        "embed_mode": embed_mode,
+        "iframe_allowed": BLOK_IFRAME_ALLOWED,
+        "iframe_blocked_reason": (
+            f"content-security-policy: frame-ancestors {BLOK_FRAME_ANCESTORS}"
+            if not BLOK_IFRAME_ALLOWED
+            else None
+        ),
+        "live_available": live_available,
+        "credentials": creds,
+        "keychain_available": creds["keychain_cli_present"] and creds["keychain_platform"],
+        "blok_url": BLOK_BASE_URL,
+        "login_url": BLOK_LOGIN_URL,
+        "live_snapshot": live_snap,
+        "proxy": {
+            "enabled": False,
+            "reason": (
+                "Reverse-proxy ke /blok/login tidak dipakai: session cookie Path=/blok "
+                "Secure SameSite=None akan rusak / tidak ikut auth jika di-rewrite ke host kita."
+            ),
+        },
+        "docs": [
+            "docs/DASHBOARD.md",
+            "docs/BLok_LIVE.md",
+            "docs/BLok_AUTOMATION.md",
+            "docs/BLok_WOCHE.md",
+        ],
+        "dry_run_dir": "output/blok_dry_run/",
+        "live_dir": "output/blok_live/",
+        "files": files,
+        "live_screenshots": live_shots,
+        "note": " ".join(note_parts),
+        "ui_label": (
+            "iframe diblokir oleh BLok — snapshot live atau buka di tab baru"
+            if not BLOK_IFRAME_ALLOWED
+            else "iframe tersedia"
+        ),
+    }
+
+
+@router.get("/dashboard/api/blok/live-snapshot")
+def dashboard_blok_live_snapshot_get(_: None = Depends(require_dashboard_access)):
+    """Return latest live snapshot meta + image URL (no Playwright run)."""
+    meta = read_latest_meta()
+    has_png = BLOK_LIVE_PNG.is_file()
+    if not meta and not has_png:
+        return {
+            "ok": False,
+            "logged_in": False,
+            "status": "none",
+            "error": "Belum ada snapshot. POST /dashboard/api/blok/live-snapshot untuk mengambil.",
+            "image_url": None,
+            "credentials": _blok_credential_status(),
+        }
+    body = dict(meta or {})
+    body["ok"] = bool(body.get("logged_in")) if meta else False
+    if has_png:
+        body["image_url"] = "/dashboard/blok-live/latest.png"
+        body["image_path"] = "output/blok_live/latest.png"
+    body["credentials"] = _blok_credential_status()
+    return body
+
+
+@router.post("/dashboard/api/blok/live-snapshot")
+def dashboard_blok_live_snapshot_post(_: None = Depends(require_dashboard_access)):
+    """Playwright login to BLok, save screenshot under output/blok_live/."""
+    creds = _blok_credential_status()
+    if not creds["credential_resolvable"]:
+        raise HTTPException(
+            400,
+            "BLok credentials missing — set BLOK_USERNAME + BLOK_PASSWORD "
+            "in .env (cloud) or Keychain on Mac.",
+        )
+    try:
+        meta = take_live_snapshot()
+    except RuntimeError as e:
+        raise HTTPException(500, str(e)) from e
+    meta = dict(meta)
+    meta["credentials"] = creds
+    return meta
+
+
+# ── Bots ────────────────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/bots")
+def dashboard_bots(_: None = Depends(require_dashboard_access)):
+    load_dotenv()
+    from berichtsheft.telegram_bot import BOT_COMMANDS, MENU_ACTIONS
+
+    tg_token = bool(os.environ.get("TELEGRAM_BOT_TOKEN", "").strip())
+    tg_chat_file = ROOT / "data" / "telegram_chat_id.txt"
+    tg_chat_id = None
+    if tg_chat_file.is_file():
+        tg_chat_id = tg_chat_file.read_text(encoding="utf-8").strip() or None
+
+    wa_chat_file = ROOT / "data" / "whatsapp_chat_id.txt"
+    wa_chat_id = None
+    if wa_chat_file.is_file():
+        wa_chat_id = wa_chat_file.read_text(encoding="utf-8").strip() or None
+
+    waha: dict[str, Any] = {"ok": False}
+    try:
+        from berichtsheft.whatsapp_bot import check_waha
+
+        waha = check_waha()
+    except Exception as e:  # noqa: BLE001
+        waha = {"ok": False, "error": str(e)}
+
+    menu_labels = list(MENU_ACTIONS.keys())
+
+    return {
+        "ok": True,
+        "telegram": {
+            "token_present": tg_token,
+            "chat_id_saved": tg_chat_id is not None,
+            "chat_id": tg_chat_id,
+            "commands": BOT_COMMANDS,
+            "menu_buttons": menu_labels,
+            "open_hint": "Buka Telegram → cari bot Anda → /start",
+            "docs": "docs/TELEGRAM.md",
+        },
+        "whatsapp": {
+            "allowlist_set": bool(os.environ.get("WHATSAPP_ALLOWED_NUMBER", "").strip()),
+            "chat_id_saved": wa_chat_id is not None,
+            "chat_id": wa_chat_id,
+            "waha": waha,
+            "open_hint": "WAHA dashboard biasanya http://127.0.0.1:3000 — lihat docs/WHATSAPP.md",
+            "docs": "docs/WHATSAPP.md",
+        },
+    }
+
+
+def mount_dashboard(app) -> None:
+    """Attach router + static assets to FastAPI app."""
+    if STATIC_DIR.is_dir():
+        app.mount(
+            "/dashboard/static",
+            StaticFiles(directory=str(STATIC_DIR)),
+            name="dashboard-static",
+        )
+    app.include_router(router)
