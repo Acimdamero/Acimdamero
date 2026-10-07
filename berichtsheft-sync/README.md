@@ -55,7 +55,8 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Setup bot Telegram |
 | [docs/WHATSAPP.md](docs/WHATSAPP.md) | **Setup bot WhatsApp (WAHA + nomor personal)** |
 | [docs/DASHBOARD.md](docs/DASHBOARD.md) | **Ops dashboard — monitor + edit katalog/jadwal** |
-| [docs/CLOUD_LOCAL_BRIDGE.md](docs/CLOUD_LOCAL_BRIDGE.md) | **Cloud ↔ Mac DB** (tunnel + `/sync` push/pull) |
+| [docs/REMOTE_ALWAYS_ON.md](docs/REMOTE_ALWAYS_ON.md) | **Mac hub 24/7** — tunnel + HP dashboard + launchd |
+| [docs/CLOUD_LOCAL_BRIDGE.md](docs/CLOUD_LOCAL_BRIDGE.md) | Cloud ↔ Mac DB (tunnel + `/sync` push/pull) |
 | [docs/CLOUD_RUN.md](docs/CLOUD_RUN.md) | Cursor Cloud VM paths & bootstrap |
 | [docs/GEMINI.md](docs/GEMINI.md) | Setup Gemini API |
 
@@ -83,19 +84,21 @@ python3 -m berichtsheft test-flow
 # Cloud one-shot: bash scripts/bootstrap_and_run.sh
 ```
 
-### Cloud ↔ Mac sync
+### Remote always-on (Mac hub)
 
 ```bash
-# Mac: serve + tunnel (DASHBOARD_TOKEN wajib)
-python3 -m berichtsheft serve
-cloudflared tunnel --url http://127.0.0.1:8765
+# Mac sekali: DASHBOARD_TOKEN di .env, lalu:
+./scripts/start_remote_hub.sh --bot
+# URL publik → data/remote_hub_url.txt
+# HP: https://<host>/dashboard?token=<DASHBOARD_TOKEN>
+# launchd: scripts/com.berichtsheft.hub.plist
 
-# Cloud: point at Mac
-python3 -m berichtsheft sync-pull --url https://<tunnel-host>
-python3 -m berichtsheft sync-push --url https://<tunnel-host>
+# Cloud: BERICHTSHEFT_REMOTE_API + BERICHTSHEFT_REMOTE_TOKEN di .env
+python3 -m berichtsheft sync-pull
+python3 -m berichtsheft sync-push
 ```
 
-Detail: [docs/CLOUD_LOCAL_BRIDGE.md](docs/CLOUD_LOCAL_BRIDGE.md)
+Detail: [docs/REMOTE_ALWAYS_ON.md](docs/REMOTE_ALWAYS_ON.md) · [docs/CLOUD_LOCAL_BRIDGE.md](docs/CLOUD_LOCAL_BRIDGE.md)
 
 ### Edit kegiatan / Abteilung
 

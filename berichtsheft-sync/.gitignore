@@ -6,6 +6,7 @@ data/whatsapp_chat_id.txt
 data/whatsapp_seen_ids.json
 data/attachments/
 data/sync_config.json
+data/remote_hub_url.txt
 
 # Konfigurasi lokal (salin dari config.example.yaml)
 config.yaml

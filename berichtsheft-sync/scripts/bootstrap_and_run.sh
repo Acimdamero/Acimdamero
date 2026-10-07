@@ -29,8 +29,11 @@ keys = [
     "WAHA_SESSION",
     "WAHA_API_KEY",
     "BERICHTSHEFT_API",
+    "BERICHTSHEFT_REMOTE_API",
+    "BERICHTSHEFT_REMOTE_TOKEN",
     "GEMINI_API_KEY",
     "DASHBOARD_TOKEN",
+    "SYNC_TOKEN",
 ]
 found = {k: os.environ.get(k, "").strip() for k in keys}
 out = []

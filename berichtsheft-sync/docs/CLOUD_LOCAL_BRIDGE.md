@@ -110,6 +110,8 @@ Ops console → **Cloud ↔ Mac**:
 | Sync pull/push to Mac API | Docker WAHA |
 | Telegram bot *if* token in `.env` and polling here | Production DB of record |
 
+For **always-on Mac hub** (launchd + phone URL + `start_remote_hub.sh`), see **[REMOTE_ALWAYS_ON.md](REMOTE_ALWAYS_ON.md)**.
+
 See also: [CLOUD_RUN.md](CLOUD_RUN.md), [DASHBOARD.md](DASHBOARD.md), [DUA_KOMPUTER.md](DUA_KOMPUTER.md), [WHATSAPP.md](WHATSAPP.md).
 
 ---

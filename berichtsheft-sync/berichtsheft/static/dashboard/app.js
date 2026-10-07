@@ -490,16 +490,65 @@
     }
   });
 
+  function syncRemoteFields() {
+    const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+    const remote_token = document.getElementById("sync-remote-token").value.trim();
+    return { remote_api_url, remote_token };
+  }
+
+  function buildRemoteDashUrl(base, token) {
+    const b = (base || "").replace(/\/$/, "");
+    if (!b) return "";
+    const t = (token || "").trim();
+    return t ? `${b}/dashboard?token=${encodeURIComponent(t)}` : `${b}/dashboard`;
+  }
+
+  function updateRemoteDashHint(data) {
+    const hint = document.getElementById("sync-remote-dash-hint");
+    const base =
+      (data && (data.remote_api_url || data.remote_dashboard_url)) ||
+      document.getElementById("sync-remote-url").value.trim();
+    const tok =
+      document.getElementById("sync-remote-token").value.trim() ||
+      localStorage.getItem("bh_remote_token") ||
+      "";
+    const url = buildRemoteDashUrl(
+      (base || "").replace(/\/dashboard.*/, ""),
+      tok,
+    );
+    if (url && tok) {
+      hint.innerHTML = `HP / deep-link Mac: <a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/\?token=.*/, "?token=…"))}</a>`;
+    } else if (base) {
+      hint.textContent = `Remote: ${base.replace(/\/dashboard.*/, "")}/dashboard?token=… (isi token untuk deep-link)`;
+    } else {
+      hint.textContent =
+        "Isi URL + token Mac, lalu Save / Health-check, atau buka https://<tunnel>/dashboard?token=<DASHBOARD_TOKEN>";
+    }
+  }
+
   async function loadSync() {
     const data = await api("/dashboard/api/sync");
-    statusPill.textContent = data.token_configured ? "sync ready" : "token missing";
-    statusPill.className = data.token_configured ? "pill ok" : "pill warn";
+    const remoteReady = Boolean(data.remote_api_url) && Boolean(data.remote_token_configured);
+    statusPill.textContent = remoteReady
+      ? "remote ready"
+      : data.token_configured
+        ? "sync ready"
+        : "token missing";
+    statusPill.className = remoteReady || data.token_configured ? "pill ok" : "pill warn";
     document.getElementById("sync-remote-url").value = data.remote_api_url || "";
+    // Never echo stored token into the password field; only show placeholder state
+    const tokInput = document.getElementById("sync-remote-token");
+    if (data.remote_token_configured && !tokInput.value) {
+      tokInput.placeholder = "token tersimpan (kosongkan = pakai yang ada / env)";
+    }
+    updateRemoteDashHint(data);
 
     const lc = data.local_counts || {};
     const cells = [
-      ["Token", data.token_configured, data.token_configured],
+      ["Local token", data.token_configured, data.token_configured],
       ["Remote URL", Boolean(data.remote_api_url), Boolean(data.remote_api_url)],
+      ["Remote token", Boolean(data.remote_token_configured), Boolean(data.remote_token_configured)],
+      ["Remote health", data.last_health_ok === true, data.last_health_ok !== false || data.last_health_ok == null],
       ["Shifts", lc.shifts > 0, true],
       ["Work logs", lc.work_logs > 0, true],
       ["Drafts", lc.drafts > 0, true],
@@ -511,6 +560,11 @@
         .map(([label, present, ok]) => {
           const cls = ok ? "ok" : "bad";
           let val = present ? "yes" : "no";
+          if (label === "Remote health") {
+            if (data.last_health_ok === true) val = "ok";
+            else if (data.last_health_ok === false) val = "fail";
+            else val = "—";
+          }
           if (label === "Shifts") val = String(lc.shifts ?? 0);
           if (label === "Work logs") val = String(lc.work_logs ?? 0);
           if (label === "Drafts") val = String(lc.drafts ?? 0);
@@ -518,6 +572,7 @@
           return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${cls}">${esc(val)}</div></div>`;
         })
         .join("") +
+      `<div class="stat"><div class="label">Last health</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_health_at || "—")}</div></div>` +
       `<div class="stat"><div class="label">Last pull</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_pull_at || "—")}</div></div>` +
       `<div class="stat"><div class="label">Last push</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_push_at || "—")}</div></div>` +
       (data.last_error
@@ -527,13 +582,65 @@
 
   document.getElementById("btn-sync-save").addEventListener("click", async () => {
     try {
-      const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+      const { remote_api_url, remote_token } = syncRemoteFields();
+      const body = { remote_api_url };
+      if (remote_token) body.remote_token = remote_token;
       const res = await api("/dashboard/api/sync/config", {
         method: "PUT",
-        body: JSON.stringify({ remote_api_url }),
+        body: JSON.stringify(body),
       });
-      setMsg("sync-msg", `Saved remote: ${res.remote_api_url || "(cleared)"}`, true);
+      if (remote_token) {
+        localStorage.setItem("bh_remote_token", remote_token);
+      }
+      setMsg(
+        "sync-msg",
+        `Saved remote: ${res.remote_api_url || "(cleared)"} · token=${res.remote_token_configured ? "yes" : "no"}`,
+        true,
+      );
+      updateRemoteDashHint(res);
       await loadSync();
+    } catch (e) {
+      setMsg("sync-msg", e.message, false);
+    }
+  });
+
+  document.getElementById("btn-sync-health").addEventListener("click", async () => {
+    try {
+      const { remote_api_url, remote_token } = syncRemoteFields();
+      setMsg("sync-msg", "health-check…", true);
+      const body = { remote_api_url };
+      if (remote_token) body.remote_token = remote_token;
+      const res = await api("/dashboard/api/sync/health", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      const r = res.result || res;
+      setMsg("sync-msg", JSON.stringify(r, null, 2), Boolean(r.ok));
+      updateRemoteDashHint(r);
+      await loadSync();
+    } catch (e) {
+      setMsg("sync-msg", e.message, false);
+    }
+  });
+
+  document.getElementById("btn-sync-open").addEventListener("click", async () => {
+    try {
+      const { remote_api_url, remote_token } = syncRemoteFields();
+      let token =
+        remote_token ||
+        localStorage.getItem("bh_remote_token") ||
+        tokenInput.value.trim();
+      if (!remote_api_url) {
+        setMsg("sync-msg", "Remote URL kosong — isi dulu atau Save dari Mac hub", false);
+        return;
+      }
+      if (!token) {
+        setMsg("sync-msg", "Token remote kosong — isi remote token (DASHBOARD_TOKEN Mac)", false);
+        return;
+      }
+      const url = buildRemoteDashUrl(remote_api_url, token);
+      window.open(url, "_blank", "noopener");
+      setMsg("sync-msg", `Opened Mac dashboard:\n${url.replace(/\?token=.*/, "?token=…")}`, true);
     } catch (e) {
       setMsg("sync-msg", e.message, false);
     }
@@ -541,11 +648,13 @@
 
   async function runSync(direction) {
     try {
-      const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+      const { remote_api_url, remote_token } = syncRemoteFields();
       setMsg("sync-msg", `${direction}…`, true);
+      const body = { direction, remote_api_url, mode: "merge" };
+      if (remote_token) body.remote_token = remote_token;
       const res = await api("/dashboard/api/sync/run", {
         method: "POST",
-        body: JSON.stringify({ direction, remote_api_url, mode: "merge" }),
+        body: JSON.stringify(body),
       });
       setMsg("sync-msg", JSON.stringify(res.result || res, null, 2), true);
       await loadSync();
@@ -556,6 +665,12 @@
 
   document.getElementById("btn-sync-pull").addEventListener("click", () => runSync("pull"));
   document.getElementById("btn-sync-push").addEventListener("click", () => runSync("push"));
+
+  // Prefill remote token from localStorage (never from server echo)
+  const savedRemoteTok = localStorage.getItem("bh_remote_token") || "";
+  if (savedRemoteTok) {
+    document.getElementById("sync-remote-token").value = savedRemoteTok;
+  }
 
   async function loadBots() {
     const data = await api("/dashboard/api/bots");

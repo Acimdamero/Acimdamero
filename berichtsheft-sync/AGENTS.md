@@ -23,5 +23,5 @@ Do **not** scatter new Berichtsheft docs outside `berichtsheft-sync/docs/`. Root
 - After editing the katalog: `python3 -m berichtsheft catalog --reload --write-md`.
 - Generator must not invent activities outside the katalog / `templates_hotelfach.json` pool.
 - Free days (`frei` / Ausgang): never push to BLok.
-- Cloud ↔ Mac DB: use tunnel + `DASHBOARD_TOKEN`/`SYNC_TOKEN` and `/sync/*` — see `docs/CLOUD_LOCAL_BRIDGE.md`. Never expose SQLite without a token.
+- Mac = source of truth for DB/Keychain/bots. Always-on remote: `scripts/start_remote_hub.sh` + `docs/REMOTE_ALWAYS_ON.md`. Cloud ↔ Mac: tunnel + `DASHBOARD_TOKEN`/`BERICHTSHEFT_REMOTE_*` + `/sync/*` — see `docs/CLOUD_LOCAL_BRIDGE.md`. Never expose SQLite without a token.
 - WAHA/Docker and Keychain run on Mac only; Cloud VM cannot provide them.

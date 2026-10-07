@@ -162,17 +162,24 @@
 
       <section id="panel-sync" class="panel">
         <p class="hint">
-          Mac menyimpan SQLite + Keychain + WAHA. Cloud mengedit lewat tunnel ke API Mac
-          (token wajib). Docs: <code>docs/CLOUD_LOCAL_BRIDGE.md</code>
+          <strong>Mac = source of truth</strong> (DB, Keychain, bots, BLok). Hub always-on lewat
+          <code>scripts/start_remote_hub.sh</code> + Cloudflare Tunnel. Cloud VM / HP hanya klien.
+          Docs: <code>docs/REMOTE_ALWAYS_ON.md</code>
         </p>
         <div id="sync-status-grid" class="grid cards"></div>
         <div class="editor-box" style="margin-top:1rem">
-          <label class="span2">Remote API URL (Cloudflare Tunnel / Tailscale)
+          <label class="span2">Remote Mac API URL (HTTPS tunnel)
             <input id="sync-remote-url" type="url" placeholder="https://….trycloudflare.com" />
           </label>
+          <label class="span2">Remote token (DASHBOARD_TOKEN Mac — disimpan lokal, tidak di-commit)
+            <input id="sync-remote-token" type="password" placeholder="sama dengan DASHBOARD_TOKEN di Mac" autocomplete="off" />
+          </label>
+          <p id="sync-remote-dash-hint" class="hint" style="margin-top:0.5rem"></p>
           <div class="actions" style="margin-top:0.75rem">
-            <button type="button" id="btn-sync-save">Save URL</button>
-            <button type="button" id="btn-sync-pull" class="primary">Pull from remote</button>
+            <button type="button" id="btn-sync-save">Save URL + token</button>
+            <button type="button" id="btn-sync-health" class="primary">Health-check remote</button>
+            <button type="button" id="btn-sync-open">Open Mac dashboard</button>
+            <button type="button" id="btn-sync-pull">Pull from remote</button>
             <button type="button" id="btn-sync-push">Push to remote</button>
           </div>
           <pre id="sync-msg" class="msg"></pre>

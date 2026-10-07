@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd KeepAlive untuk Mac always-on hub (serve + tunnel + optional bot).
+
+  SETUP (sekali di Mac):
+    1. Edit WorkingDirectory / ProgramArguments path di bawah → folder berichtsheft-sync Anda
+       (contoh: /Users/ANDA/Projects/berichtsheft-sync)
+    2. Pastikan .env punya DASHBOARD_TOKEN (wajib) + TELEGRAM_BOT_TOKEN jika --bot
+    3. Install cloudflared: brew install cloudflare/cloudflare/cloudflared
+    4. Salin plist:
+         cp scripts/com.berichtsheft.hub.plist ~/Library/LaunchAgents/
+         # lalu edit path di ~/Library/LaunchAgents/com.berichtsheft.hub.plist
+    5. Load:
+         launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.berichtsheft.hub.plist
+         # atau (macOS lama): launchctl load ~/Library/LaunchAgents/com.berichtsheft.hub.plist
+    6. Cek:
+         launchctl print gui/$(id -u)/com.berichtsheft.hub
+         cat data/remote_hub_url.txt
+         # HP: https://<url>/dashboard?token=<DASHBOARD_TOKEN>
+
+  STOP / UNLOAD:
+    launchctl bootout gui/$(id -u)/com.berichtsheft.hub
+    # atau: launchctl unload ~/Library/LaunchAgents/com.berichtsheft.hub.plist
+    ./scripts/start_remote_hub.sh --stop
+
+  CATATAN:
+  - KeepAlive=true → relaunch jika crash / logout session tergantung Label scope
+  - Quick tunnel URL berubah setiap restart → baca ulang data/remote_hub_url.txt
+  - Untuk URL stabil: pakai named Cloudflare Tunnel + DNS (lihat docs/REMOTE_ALWAYS_ON.md)
+  - Jangan commit .env / remote_hub_url.txt / tokens
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.berichtsheft.hub</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/REPLACE_ME/Projects/berichtsheft-sync</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/REPLACE_ME/Projects/berichtsheft-sync/scripts/start_remote_hub.sh</string>
+    <string>--bot</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/REPLACE_ME/Projects/berichtsheft-sync/logs/launchd-hub.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/REPLACE_ME/Projects/berichtsheft-sync/logs/launchd-hub.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>START_BOT</key>
+    <string>1</string>
+  </dict>
+</dict>
+</plist>

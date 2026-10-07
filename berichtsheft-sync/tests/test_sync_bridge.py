@@ -130,16 +130,85 @@ class TestSyncBridge(unittest.TestCase):
         r = self.client.put(
             "/dashboard/api/sync/config",
             headers=self._auth(),
-            json={"remote_api_url": "https://example.trycloudflare.com"},
+            json={
+                "remote_api_url": "https://example.trycloudflare.com",
+                "remote_token": "mac-hub-token",
+            },
         )
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["remote_api_url"], "https://example.trycloudflare.com")
+        self.assertTrue(r.json()["remote_token_configured"])
+        self.assertTrue(r.json()["remote_dashboard_url"].endswith("/dashboard"))
+        self.assertNotIn("mac-hub-token", r.json()["remote_dashboard_url"])
         cfg = sync_bridge.load_sync_config()
         self.assertEqual(cfg["remote_api_url"], "https://example.trycloudflare.com")
+        self.assertEqual(cfg["remote_token"], "mac-hub-token")
 
         r2 = self.client.get("/dashboard/api/sync", headers=self._auth())
         self.assertEqual(r2.status_code, 200)
         self.assertIn("example.trycloudflare.com", r2.json()["remote_api_url"])
+        self.assertTrue(r2.json()["remote_token_configured"])
+        # never echo raw token in status payload
+        self.assertNotIn("mac-hub-token", json.dumps(r2.json()))
+
+    def test_remote_token_env_precedence(self) -> None:
+        os.environ["BERICHTSHEFT_REMOTE_TOKEN"] = "env-remote"
+        cfg = {"remote_token": "file-token"}
+        self.assertEqual(sync_bridge.remote_token(cfg), "env-remote")
+        del os.environ["BERICHTSHEFT_REMOTE_TOKEN"]
+        self.assertEqual(sync_bridge.remote_token(cfg), "file-token")
+
+    def test_health_check_remote_mocked(self) -> None:
+        class FakeResp:
+            def __init__(self, code: int, payload: dict):
+                self.status_code = code
+                self._payload = payload
+                self.text = json.dumps(payload)
+
+            def json(self):
+                return self._payload
+
+        class FakeClient:
+            def __init__(self, *a, **k):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def get(self, url, headers=None):
+                if url.endswith("/health"):
+                    return FakeResp(200, {"status": "ok"})
+                return FakeResp(200, {"ok": True})
+
+        with mock.patch.object(sync_bridge.httpx, "Client", FakeClient):
+            result = sync_bridge.health_check_remote(
+                "https://hub.example", "tok"
+            )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["dashboard_url"], "https://hub.example/dashboard")
+
+        with mock.patch.object(
+            sync_bridge,
+            "health_check_remote",
+            return_value={
+                "ok": True,
+                "remote_api_url": "https://hub.example",
+                "dashboard_url": "https://hub.example/dashboard",
+                "health": {"ok": True, "status_code": 200},
+                "dashboard": {"ok": True, "status_code": 200},
+                "error": None,
+            },
+        ):
+            r = self.client.post(
+                "/dashboard/api/sync/health",
+                headers=self._auth(),
+                json={"remote_api_url": "https://hub.example"},
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["result"]["ok"])
 
 
 if __name__ == "__main__":

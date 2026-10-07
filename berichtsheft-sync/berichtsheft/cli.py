@@ -489,8 +489,7 @@ def _resolve_sync_url_token(args: argparse.Namespace) -> tuple[str, str]:
     )
     token = (
         (args.token or "").strip()
-        or os.environ.get("SYNC_TOKEN", "").strip()
-        or os.environ.get("DASHBOARD_TOKEN", "").strip()
+        or sync_bridge.remote_token(cfg)
     )
     if not url:
         print(
@@ -501,7 +500,8 @@ def _resolve_sync_url_token(args: argparse.Namespace) -> tuple[str, str]:
         raise SystemExit(1)
     if not token:
         print(
-            "✗ Token kosong — pass --token atau set SYNC_TOKEN / DASHBOARD_TOKEN",
+            "✗ Token kosong — pass --token atau set BERICHTSHEFT_REMOTE_TOKEN / "
+            "SYNC_TOKEN / DASHBOARD_TOKEN",
             file=sys.stderr,
         )
         raise SystemExit(1)

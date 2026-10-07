@@ -60,13 +60,21 @@ class ShiftsJsonBody(BaseModel):
 
 class SyncConfigBody(BaseModel):
     remote_api_url: str = ""
+    # Optional; stored only in gitignored data/sync_config.json
+    remote_token: Optional[str] = None
 
 
 class SyncRemoteBody(BaseModel):
     direction: str = Field(description="pull or push")
     remote_api_url: Optional[str] = None
+    remote_token: Optional[str] = None
     include_files: bool = False
     mode: str = "merge"
+
+
+class SyncHealthBody(BaseModel):
+    remote_api_url: Optional[str] = None
+    remote_token: Optional[str] = None
 
 
 def _dashboard_token() -> str:
@@ -744,12 +752,54 @@ def dashboard_sync_config(
 ):
     cfg = sync_bridge.load_sync_config()
     cfg["remote_api_url"] = (body.remote_api_url or "").strip().rstrip("/")
+    # Only update token when client sends a non-empty value (blank = keep existing)
+    if body.remote_token is not None and body.remote_token.strip():
+        cfg["remote_token"] = body.remote_token.strip()
     path = sync_bridge.save_sync_config(cfg)
+    r_tok = sync_bridge.remote_token(cfg)
     return {
         "ok": True,
         "path": _rel(path),
         "remote_api_url": cfg["remote_api_url"],
+        "remote_token_configured": bool(r_tok),
+        # never embed token in JSON responses
+        "remote_dashboard_url": sync_bridge.remote_dashboard_url(
+            cfg["remote_api_url"], include_token=False
+        ),
     }
+
+
+@router.post("/dashboard/api/sync/health")
+def dashboard_sync_health(
+    body: SyncHealthBody,
+    _: None = Depends(require_dashboard_access),
+):
+    """Health-check remote Mac hub (/health + /dashboard/api/health)."""
+    cfg = sync_bridge.load_sync_config()
+    url = (body.remote_api_url or cfg.get("remote_api_url") or "").strip().rstrip("/")
+    if not url:
+        raise HTTPException(
+            400,
+            "remote_api_url kosong — isi di panel Cloud↔Mac atau BERICHTSHEFT_REMOTE_API",
+        )
+    if body.remote_token is not None and body.remote_token.strip():
+        cfg["remote_token"] = body.remote_token.strip()
+        sync_bridge.save_sync_config(cfg)
+    token = (
+        (body.remote_token or "").strip()
+        or sync_bridge.remote_token(cfg)
+    )
+    result = sync_bridge.health_check_remote(url, token)
+    cfg = sync_bridge.load_sync_config()
+    cfg["remote_api_url"] = url
+    cfg["last_health_at"] = sync_bridge._utc_now()
+    cfg["last_health_ok"] = bool(result.get("ok"))
+    if not result.get("ok"):
+        cfg["last_error"] = result.get("error") or "health check failed"
+    else:
+        cfg["last_error"] = None
+    sync_bridge.save_sync_config(cfg)
+    return {"ok": True, "result": result}
 
 
 @router.post("/dashboard/api/sync/run")
@@ -757,7 +807,7 @@ def dashboard_sync_run(
     body: SyncRemoteBody,
     _: None = Depends(require_dashboard_access),
 ):
-    """Pull from / push to remote Mac API (uses SYNC_TOKEN or DASHBOARD_TOKEN)."""
+    """Pull from / push to remote Mac API (BERICHTSHEFT_REMOTE_TOKEN / sync token)."""
     direction = (body.direction or "").strip().lower()
     if direction not in ("pull", "push"):
         raise HTTPException(400, "direction must be pull or push")
@@ -769,11 +819,17 @@ def dashboard_sync_run(
             400,
             "remote_api_url kosong — isi di panel Sync atau BERICHTSHEFT_REMOTE_API",
         )
-    token = sync_bridge.sync_token()
+    if body.remote_token is not None and body.remote_token.strip():
+        cfg["remote_token"] = body.remote_token.strip()
+        sync_bridge.save_sync_config(cfg)
+    token = (
+        (body.remote_token or "").strip()
+        or sync_bridge.remote_token(cfg)
+    )
     if not token:
         raise HTTPException(
             503,
-            "SYNC_TOKEN atau DASHBOARD_TOKEN wajib untuk sync remote",
+            "BERICHTSHEFT_REMOTE_TOKEN / SYNC_TOKEN / DASHBOARD_TOKEN wajib untuk sync remote",
         )
 
     try:

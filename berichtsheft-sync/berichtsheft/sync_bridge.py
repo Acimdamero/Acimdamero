@@ -45,16 +45,37 @@ def sync_token() -> str:
     )
 
 
+def remote_token(cfg: Optional[dict[str, Any]] = None) -> str:
+    """Token for calling the remote Mac hub.
+
+    Order: BERICHTSHEFT_REMOTE_TOKEN → sync_config.remote_token (local file, gitignored)
+    → SYNC_TOKEN → DASHBOARD_TOKEN.
+    """
+    load_dotenv()
+    env_remote = os.environ.get("BERICHTSHEFT_REMOTE_TOKEN", "").strip()
+    if env_remote:
+        return env_remote
+    if cfg is None:
+        cfg = load_sync_config()
+    stored = (cfg.get("remote_token") or "").strip()
+    if stored:
+        return stored
+    return sync_token()
+
+
 def load_sync_config() -> dict[str, Any]:
     if not SYNC_CONFIG_PATH.is_file():
         return {
             "remote_api_url": os.environ.get("BERICHTSHEFT_REMOTE_API", "").strip()
             or os.environ.get("BERICHTSHEFT_API", "").strip()
             or "",
+            "remote_token": "",
             "last_pull_at": None,
             "last_push_at": None,
             "last_error": None,
             "last_counts": {},
+            "last_health_at": None,
+            "last_health_ok": None,
         }
     try:
         data = json.loads(SYNC_CONFIG_PATH.read_text(encoding="utf-8"))
@@ -63,28 +84,107 @@ def load_sync_config() -> dict[str, Any]:
     if not isinstance(data, dict):
         data = {}
     data.setdefault("remote_api_url", "")
+    data.setdefault("remote_token", "")
     data.setdefault("last_pull_at", None)
     data.setdefault("last_push_at", None)
     data.setdefault("last_error", None)
     data.setdefault("last_counts", {})
+    data.setdefault("last_health_at", None)
+    data.setdefault("last_health_ok", None)
+    # env wins for URL when file empty
+    if not (data.get("remote_api_url") or "").strip():
+        data["remote_api_url"] = (
+            os.environ.get("BERICHTSHEFT_REMOTE_API", "").strip()
+            or os.environ.get("BERICHTSHEFT_API", "").strip()
+            or ""
+        )
     return data
 
 
 def save_sync_config(cfg: dict[str, Any]) -> Path:
     SYNC_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # never persist tokens
+    # remote_token only in this gitignored local file — never commit
     clean = {
         "remote_api_url": (cfg.get("remote_api_url") or "").strip().rstrip("/"),
+        "remote_token": (cfg.get("remote_token") or "").strip(),
         "last_pull_at": cfg.get("last_pull_at"),
         "last_push_at": cfg.get("last_push_at"),
         "last_error": cfg.get("last_error"),
         "last_counts": cfg.get("last_counts") or {},
+        "last_health_at": cfg.get("last_health_at"),
+        "last_health_ok": cfg.get("last_health_ok"),
     }
     SYNC_CONFIG_PATH.write_text(
         json.dumps(clean, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     return SYNC_CONFIG_PATH
+
+
+def remote_dashboard_url(url: str, token: str = "", *, include_token: bool = True) -> str:
+    """Build Mac dashboard URL. Pass include_token=False for API status payloads."""
+    base = url.strip().rstrip("/")
+    if not base:
+        return ""
+    if include_token and token:
+        return f"{base}/dashboard?token={token}"
+    return f"{base}/dashboard"
+
+
+def health_check_remote(
+    url: str,
+    token: str,
+    *,
+    timeout: float = 15.0,
+) -> dict[str, Any]:
+    """Probe remote /health and /dashboard/api/health (token for dashboard)."""
+    base = url.strip().rstrip("/")
+    if not base:
+        raise ValueError("remote_api_url kosong")
+    headers = _auth_headers(token) if token else {}
+    result: dict[str, Any] = {
+        "ok": False,
+        "remote_api_url": base,
+        "health": None,
+        "dashboard": None,
+        # health-check result may include token for operator deep-link; callers
+        # that expose JSON to browsers should prefer include_token=False
+        "dashboard_url": remote_dashboard_url(base, token, include_token=False),
+        "error": None,
+    }
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            h = client.get(f"{base}/health")
+            result["health"] = {
+                "status_code": h.status_code,
+                "ok": h.status_code == 200,
+                "body": _safe_json(h),
+            }
+            d = client.get(f"{base}/dashboard/api/health", headers=headers)
+            result["dashboard"] = {
+                "status_code": d.status_code,
+                "ok": d.status_code == 200,
+                "body": _safe_json(d),
+            }
+            result["ok"] = bool(result["health"]["ok"] and result["dashboard"]["ok"])
+            if not result["ok"] and d.status_code in (401, 403):
+                result["error"] = "token ditolak remote (cek BERICHTSHEFT_REMOTE_TOKEN)"
+            elif not result["ok"]:
+                result["error"] = (
+                    f"health={h.status_code} dashboard={d.status_code}"
+                )
+    except Exception as e:  # noqa: BLE001
+        result["error"] = str(e)
+        result["ok"] = False
+    return result
+
+
+def _safe_json(resp: httpx.Response) -> Any:
+    try:
+        return resp.json()
+    except Exception:  # noqa: BLE001
+        text = (resp.text or "")[:200]
+        return {"raw": text} if text else None
 
 
 def _row_dict(row) -> dict[str, Any]:
@@ -407,22 +507,32 @@ def status_summary(conn) -> dict[str, Any]:
         "approvals": conn.execute("SELECT COUNT(*) FROM approvals").fetchone()[0],
         "attachments": conn.execute("SELECT COUNT(*) FROM attachments").fetchone()[0],
     }
+    r_url = (cfg.get("remote_api_url") or "").strip().rstrip("/")
+    r_tok = remote_token(cfg)
     return {
         "ok": True,
         "schema_version": SCHEMA_VERSION,
         "token_required": token_set,
         "token_configured": token_set,
-        "remote_api_url": cfg.get("remote_api_url") or "",
+        "remote_api_url": r_url,
+        "remote_token_configured": bool(r_tok),
+        # never embed token in status JSON
+        "remote_dashboard_url": (
+            remote_dashboard_url(r_url, include_token=False) if r_url else ""
+        ),
         "last_pull_at": cfg.get("last_pull_at"),
         "last_push_at": cfg.get("last_push_at"),
         "last_error": cfg.get("last_error"),
         "last_counts": cfg.get("last_counts") or {},
+        "last_health_at": cfg.get("last_health_at"),
+        "last_health_ok": cfg.get("last_health_ok"),
         "local_counts": counts,
         "db_path": str(Path(db.DEFAULT_DB).name),
-        "docs": "docs/CLOUD_LOCAL_BRIDGE.md",
+        "docs": "docs/REMOTE_ALWAYS_ON.md",
         "mode_a_hint": (
-            "Mac: expose serve via cloudflared/Tailscale + DASHBOARD_TOKEN. "
-            "Cloud: set remote_api_url / BERICHTSHEFT_API to that URL."
+            "Mac = source of truth (DB/Keychain/bots). "
+            "scripts/start_remote_hub.sh + DASHBOARD_TOKEN; "
+            "Cloud/HP: BERICHTSHEFT_REMOTE_API + open /dashboard?token="
         ),
     }
 
