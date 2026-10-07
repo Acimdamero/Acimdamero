@@ -126,6 +126,19 @@ if [[ ! -f berichtsheft.db ]]; then
   PYTHONPATH="$ROOT" python3 -m berichtsheft init
 fi
 
+# Resolve cloudflared (Homebrew, local bin, or Cloud VM /tmp demo binary)
+if ! command -v cloudflared >/dev/null 2>&1; then
+  for candidate in \
+    /opt/homebrew/bin/cloudflared \
+    /usr/local/bin/cloudflared \
+    "$HOME/.local/bin/cloudflared" \
+    /tmp/cloudflared; do
+    if [[ -x "$candidate" ]]; then
+      export PATH="$(dirname "$candidate"):$PATH"
+      break
+    fi
+  done
+fi
 if ! command -v cloudflared >/dev/null 2>&1; then
   echo "✗ cloudflared tidak ditemukan."
   echo "  Mac: brew install cloudflare/cloudflare/cloudflared"
