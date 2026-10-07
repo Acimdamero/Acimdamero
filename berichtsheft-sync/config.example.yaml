@@ -28,5 +28,6 @@ wifi:
   check_interval_minutes: 10
 
 server:
-  host: "127.0.0.1"
+  # localhost only: "127.0.0.1" — remote/tunnel/HP: "0.0.0.0" + DASHBOARD_TOKEN
+  host: "0.0.0.0"
   port: 8765
