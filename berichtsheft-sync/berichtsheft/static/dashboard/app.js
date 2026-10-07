@@ -6,6 +6,7 @@
     shifts: "Jadwal / Shifts",
     school: "Sekolah / Templates",
     blok: "BLok Live",
+    sync: "Cloud ↔ Mac",
     bots: "Bots",
   };
 
@@ -81,6 +82,7 @@
       if (name === "shifts") await loadShiftsTable();
       if (name === "school") await loadSchool();
       if (name === "blok") await loadBlok();
+      if (name === "sync") await loadSync();
       if (name === "bots") await loadBots();
     } catch (e) {
       statusPill.textContent = e.message;
@@ -487,6 +489,73 @@
       btn.disabled = false;
     }
   });
+
+  async function loadSync() {
+    const data = await api("/dashboard/api/sync");
+    statusPill.textContent = data.token_configured ? "sync ready" : "token missing";
+    statusPill.className = data.token_configured ? "pill ok" : "pill warn";
+    document.getElementById("sync-remote-url").value = data.remote_api_url || "";
+
+    const lc = data.local_counts || {};
+    const cells = [
+      ["Token", data.token_configured, data.token_configured],
+      ["Remote URL", Boolean(data.remote_api_url), Boolean(data.remote_api_url)],
+      ["Shifts", lc.shifts > 0, true],
+      ["Work logs", lc.work_logs > 0, true],
+      ["Drafts", lc.drafts > 0, true],
+      ["Approvals", (lc.approvals || 0) >= 0, true],
+    ];
+    const grid = document.getElementById("sync-status-grid");
+    grid.innerHTML =
+      cells
+        .map(([label, present, ok]) => {
+          const cls = ok ? "ok" : "bad";
+          let val = present ? "yes" : "no";
+          if (label === "Shifts") val = String(lc.shifts ?? 0);
+          if (label === "Work logs") val = String(lc.work_logs ?? 0);
+          if (label === "Drafts") val = String(lc.drafts ?? 0);
+          if (label === "Approvals") val = String(lc.approvals ?? 0);
+          return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${cls}">${esc(val)}</div></div>`;
+        })
+        .join("") +
+      `<div class="stat"><div class="label">Last pull</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_pull_at || "—")}</div></div>` +
+      `<div class="stat"><div class="label">Last push</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_push_at || "—")}</div></div>` +
+      (data.last_error
+        ? `<div class="stat"><div class="label">Last error</div><div class="value bad" style="font-size:0.75rem;font-weight:400">${esc(data.last_error)}</div></div>`
+        : "");
+  }
+
+  document.getElementById("btn-sync-save").addEventListener("click", async () => {
+    try {
+      const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+      const res = await api("/dashboard/api/sync/config", {
+        method: "PUT",
+        body: JSON.stringify({ remote_api_url }),
+      });
+      setMsg("sync-msg", `Saved remote: ${res.remote_api_url || "(cleared)"}`, true);
+      await loadSync();
+    } catch (e) {
+      setMsg("sync-msg", e.message, false);
+    }
+  });
+
+  async function runSync(direction) {
+    try {
+      const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+      setMsg("sync-msg", `${direction}…`, true);
+      const res = await api("/dashboard/api/sync/run", {
+        method: "POST",
+        body: JSON.stringify({ direction, remote_api_url, mode: "merge" }),
+      });
+      setMsg("sync-msg", JSON.stringify(res.result || res, null, 2), true);
+      await loadSync();
+    } catch (e) {
+      setMsg("sync-msg", e.message, false);
+    }
+  }
+
+  document.getElementById("btn-sync-pull").addEventListener("click", () => runSync("pull"));
+  document.getElementById("btn-sync-push").addEventListener("click", () => runSync("push"));
 
   async function loadBots() {
     const data = await api("/dashboard/api/bots");

@@ -23,6 +23,7 @@
         <button type="button" data-panel="shifts">Jadwal / Shifts</button>
         <button type="button" data-panel="school">Sekolah / Templates</button>
         <button type="button" data-panel="blok">BLok Live</button>
+        <button type="button" data-panel="sync">Cloud ↔ Mac</button>
         <button type="button" data-panel="bots">Bots</button>
       </nav>
       <footer class="sidebar-foot">
@@ -157,6 +158,25 @@
         <iframe id="blok-iframe" title="BLok dry-run preview" class="blok-frame hidden"></iframe>
         <img id="blok-shot-img" class="blok-shot hidden" alt="BLok live screenshot" />
         <pre id="blok-json" class="msg hidden"></pre>
+      </section>
+
+      <section id="panel-sync" class="panel">
+        <p class="hint">
+          Mac menyimpan SQLite + Keychain + WAHA. Cloud mengedit lewat tunnel ke API Mac
+          (token wajib). Docs: <code>docs/CLOUD_LOCAL_BRIDGE.md</code>
+        </p>
+        <div id="sync-status-grid" class="grid cards"></div>
+        <div class="editor-box" style="margin-top:1rem">
+          <label class="span2">Remote API URL (Cloudflare Tunnel / Tailscale)
+            <input id="sync-remote-url" type="url" placeholder="https://….trycloudflare.com" />
+          </label>
+          <div class="actions" style="margin-top:0.75rem">
+            <button type="button" id="btn-sync-save">Save URL</button>
+            <button type="button" id="btn-sync-pull" class="primary">Pull from remote</button>
+            <button type="button" id="btn-sync-push">Push to remote</button>
+          </div>
+          <pre id="sync-msg" class="msg"></pre>
+        </div>
       </section>
 
       <section id="panel-bots" class="panel">

@@ -475,6 +475,94 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_sync_url_token(args: argparse.Namespace) -> tuple[str, str]:
+    from berichtsheft import sync_bridge
+    from berichtsheft.config_loader import load_dotenv
+
+    load_dotenv()
+    cfg = sync_bridge.load_sync_config()
+    url = (
+        (args.url or "").strip()
+        or os.environ.get("BERICHTSHEFT_REMOTE_API", "").strip()
+        or cfg.get("remote_api_url")
+        or os.environ.get("BERICHTSHEFT_API", "").strip()
+    )
+    token = (
+        (args.token or "").strip()
+        or os.environ.get("SYNC_TOKEN", "").strip()
+        or os.environ.get("DASHBOARD_TOKEN", "").strip()
+    )
+    if not url:
+        print(
+            "✗ URL kosong — pass --url atau set BERICHTSHEFT_REMOTE_API / "
+            "data/sync_config.json",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if not token:
+        print(
+            "✗ Token kosong — pass --token atau set SYNC_TOKEN / DASHBOARD_TOKEN",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    return url.rstrip("/"), token
+
+
+def cmd_sync_pull(args: argparse.Namespace) -> int:
+    from berichtsheft import sync_bridge
+
+    url, token = _resolve_sync_url_token(args)
+    try:
+        result = sync_bridge.cli_sync_pull(
+            url,
+            token,
+            include_attachment_files=args.files,
+            apply=not args.dry_run,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"✗ sync-pull gagal: {e}", file=sys.stderr)
+        cfg = sync_bridge.load_sync_config()
+        cfg["last_error"] = str(e)
+        sync_bridge.save_sync_config(cfg)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(f"✓ sync-pull dari {url}")
+    return 0
+
+
+def cmd_sync_push(args: argparse.Namespace) -> int:
+    from berichtsheft import sync_bridge
+
+    url, token = _resolve_sync_url_token(args)
+    try:
+        result = sync_bridge.cli_sync_push(
+            url,
+            token,
+            include_attachment_files=args.files,
+            mode=args.mode,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"✗ sync-push gagal: {e}", file=sys.stderr)
+        cfg = sync_bridge.load_sync_config()
+        cfg["last_error"] = str(e)
+        sync_bridge.save_sync_config(cfg)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(f"✓ sync-push ke {url}")
+    return 0
+
+
+def cmd_sync_status(_: argparse.Namespace) -> int:
+    from berichtsheft import sync_bridge
+
+    conn = db.connect()
+    db.init_schema(conn)
+    summary = sync_bridge.status_summary(conn)
+    conn.close()
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Berichtsheft-Sync — Hotelfachmann")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -624,6 +712,54 @@ def main() -> int:
     p_exp.add_argument("--to", dest="to_date")
     p_exp.add_argument("-o", "--output")
     p_exp.set_defaults(func=cmd_export)
+
+    p_spull = sub.add_parser(
+        "sync-pull",
+        help="tarik shifts/logs/drafts/katalog dari remote API (Mac via tunnel)",
+    )
+    p_spull.add_argument(
+        "--url",
+        help="base URL remote (default: BERICHTSHEFT_REMOTE_API / sync_config)",
+    )
+    p_spull.add_argument(
+        "--token",
+        help="SYNC_TOKEN atau DASHBOARD_TOKEN (default: env)",
+    )
+    p_spull.add_argument(
+        "--files",
+        action="store_true",
+        help="ikutkan isi lampiran kecil (base64)",
+    )
+    p_spull.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="unduh payload saja, jangan tulis DB lokal",
+    )
+    p_spull.set_defaults(func=cmd_sync_pull)
+
+    p_spush = sub.add_parser(
+        "sync-push",
+        help="dorong shifts/logs/drafts/katalog ke remote API",
+    )
+    p_spush.add_argument("--url", help="base URL remote")
+    p_spush.add_argument("--token", help="SYNC_TOKEN atau DASHBOARD_TOKEN")
+    p_spush.add_argument(
+        "--files",
+        action="store_true",
+        help="ikutkan isi lampiran kecil (base64)",
+    )
+    p_spush.add_argument(
+        "--mode",
+        choices=("merge", "replace"),
+        default="merge",
+        help="strategi apply di remote (default: merge)",
+    )
+    p_spush.set_defaults(func=cmd_sync_push)
+
+    sub.add_parser(
+        "sync-status",
+        help="status sync lokal + remote URL tersimpan",
+    ).set_defaults(func=cmd_sync_status)
 
     args = parser.parse_args()
     return args.func(args)

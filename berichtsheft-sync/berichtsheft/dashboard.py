@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from berichtsheft import catalog, credentials as cred_mod, db
+from berichtsheft import catalog, credentials as cred_mod, db, sync_bridge
 from berichtsheft.ai_gemini import is_enabled as gemini_enabled
 from berichtsheft.ai_vision import is_vision_enabled
 from berichtsheft.blok_live_snapshot import (
@@ -56,6 +56,17 @@ class ShiftBody(BaseModel):
 class ShiftsJsonBody(BaseModel):
     data: dict[str, Any]
     import_to_db: bool = True
+
+
+class SyncConfigBody(BaseModel):
+    remote_api_url: str = ""
+
+
+class SyncRemoteBody(BaseModel):
+    direction: str = Field(description="pull or push")
+    remote_api_url: Optional[str] = None
+    include_files: bool = False
+    mode: str = "merge"
 
 
 def _dashboard_token() -> str:
@@ -706,6 +717,85 @@ def dashboard_blok_live_snapshot_post(_: None = Depends(require_dashboard_access
     meta = dict(meta)
     meta["credentials"] = creds
     return meta
+
+
+# ── Cloud ↔ Mac sync ────────────────────────────────────────────────────────
+
+
+@router.get("/dashboard/api/sync")
+def dashboard_sync_status(_: None = Depends(require_dashboard_access)):
+    conn = _conn()
+    try:
+        summary = sync_bridge.status_summary(conn)
+    finally:
+        conn.close()
+    summary["endpoints"] = {
+        "pull": "GET /sync/pull",
+        "push": "POST /sync/push",
+        "status": "GET /sync/status",
+    }
+    return summary
+
+
+@router.put("/dashboard/api/sync/config")
+def dashboard_sync_config(
+    body: SyncConfigBody,
+    _: None = Depends(require_dashboard_access),
+):
+    cfg = sync_bridge.load_sync_config()
+    cfg["remote_api_url"] = (body.remote_api_url or "").strip().rstrip("/")
+    path = sync_bridge.save_sync_config(cfg)
+    return {
+        "ok": True,
+        "path": _rel(path),
+        "remote_api_url": cfg["remote_api_url"],
+    }
+
+
+@router.post("/dashboard/api/sync/run")
+def dashboard_sync_run(
+    body: SyncRemoteBody,
+    _: None = Depends(require_dashboard_access),
+):
+    """Pull from / push to remote Mac API (uses SYNC_TOKEN or DASHBOARD_TOKEN)."""
+    direction = (body.direction or "").strip().lower()
+    if direction not in ("pull", "push"):
+        raise HTTPException(400, "direction must be pull or push")
+
+    cfg = sync_bridge.load_sync_config()
+    url = (body.remote_api_url or cfg.get("remote_api_url") or "").strip().rstrip("/")
+    if not url:
+        raise HTTPException(
+            400,
+            "remote_api_url kosong — isi di panel Sync atau BERICHTSHEFT_REMOTE_API",
+        )
+    token = sync_bridge.sync_token()
+    if not token:
+        raise HTTPException(
+            503,
+            "SYNC_TOKEN atau DASHBOARD_TOKEN wajib untuk sync remote",
+        )
+
+    try:
+        if direction == "pull":
+            result = sync_bridge.cli_sync_pull(
+                url, token, include_attachment_files=body.include_files
+            )
+        else:
+            result = sync_bridge.cli_sync_push(
+                url,
+                token,
+                include_attachment_files=body.include_files,
+                mode=body.mode or "merge",
+            )
+    except Exception as e:  # noqa: BLE001
+        cfg = sync_bridge.load_sync_config()
+        cfg["remote_api_url"] = url
+        cfg["last_error"] = str(e)
+        sync_bridge.save_sync_config(cfg)
+        raise HTTPException(502, f"sync {direction} gagal: {e}") from e
+
+    return {"ok": True, "direction": direction, "result": result}
 
 
 # ── Bots ────────────────────────────────────────────────────────────────────

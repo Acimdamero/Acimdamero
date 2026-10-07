@@ -55,6 +55,8 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Setup bot Telegram |
 | [docs/WHATSAPP.md](docs/WHATSAPP.md) | **Setup bot WhatsApp (WAHA + nomor personal)** |
 | [docs/DASHBOARD.md](docs/DASHBOARD.md) | **Ops dashboard — monitor + edit katalog/jadwal** |
+| [docs/CLOUD_LOCAL_BRIDGE.md](docs/CLOUD_LOCAL_BRIDGE.md) | **Cloud ↔ Mac DB** (tunnel + `/sync` push/pull) |
+| [docs/CLOUD_RUN.md](docs/CLOUD_RUN.md) | Cursor Cloud VM paths & bootstrap |
 | [docs/GEMINI.md](docs/GEMINI.md) | Setup Gemini API |
 
 ---
@@ -62,19 +64,38 @@ Detail lengkap: [docs/TECH_STACK.md](docs/TECH_STACK.md)
 ## Quick start
 
 ```bash
+# Mac:
 cd ~/Projects/berichtsheft-sync
-python3 -m venv .venv && source .venv/bin/activate
+# Cursor Cloud VM:
+# cd /workspace/berichtsheft-sync
+
+python3 -m venv .venv && source .venv/bin/activate   # optional; Cloud often uses system pip --user
 pip install -r requirements.txt
 playwright install chromium
 
-cp .env.example .env          # isi TELEGRAM_BOT_TOKEN, dll.
+cp .env.example .env          # isi TELEGRAM_BOT_TOKEN, DASHBOARD_TOKEN, dll.
 cp config.example.yaml config.yaml   # sesuaikan selector BLok
 
 python3 -m berichtsheft init
 python3 -m berichtsheft import data/shifts_kw23_24.json
 python3 -m berichtsheft catalog          # lihat kegiatan per Abteilung
 python3 -m berichtsheft test-flow
+# Cloud one-shot: bash scripts/bootstrap_and_run.sh
 ```
+
+### Cloud ↔ Mac sync
+
+```bash
+# Mac: serve + tunnel (DASHBOARD_TOKEN wajib)
+python3 -m berichtsheft serve
+cloudflared tunnel --url http://127.0.0.1:8765
+
+# Cloud: point at Mac
+python3 -m berichtsheft sync-pull --url https://<tunnel-host>
+python3 -m berichtsheft sync-push --url https://<tunnel-host>
+```
+
+Detail: [docs/CLOUD_LOCAL_BRIDGE.md](docs/CLOUD_LOCAL_BRIDGE.md)
 
 ### Edit kegiatan / Abteilung
 
@@ -119,25 +140,16 @@ Edit katalog / jadwal dari UI — lihat [docs/DASHBOARD.md](docs/DASHBOARD.md).
 ## Struktur proyek
 
 ```
-berichtsheft-sync/
-├── berichtsheft/       # Modul Python utama
-│   ├── catalog.py      # Katalog kegiatan per Abteilung
-│   ├── cli.py          # Perintah CLI
-│   ├── telegram_bot.py # Bot Telegram
-│   ├── whatsapp_bot.py # Bot WhatsApp (WAHA)
-│   ├── api_server.py   # REST API lokal (+ webhook WA)
-│   ├── dashboard.py    # Ops dashboard /dashboard
-│   ├── orchestrator.py # Gabung log → draft
-│   ├── blok_worker.py  # Playwright BLok
-│   └── ...
-├── data/
-│   ├── katalog_abteilung.json  # ← edit kegiatan di sini
-│   ├── areas_hotel.json        # sync otomatis dari katalog
-│   ├── templates_hotelfach.json
-│   └── blok_mapping.yaml
-├── docs/               # Dokumentasi
-├── scripts/            # Utilitas (probe, explore, WiFi)
-├── tests/              # Unit test
+berichtsheft-sync/          # ← single source of truth
+├── berichtsheft/           # Modul Python utama
+│   ├── sync_bridge.py      # Cloud ↔ Mac /sync push-pull
+│   ├── api_server.py       # REST API (+ /sync + webhook WA)
+│   ├── dashboard.py        # Ops dashboard /dashboard
+│   ├── catalog.py / cli.py / telegram_bot.py / whatsapp_bot.py …
+├── data/                   # katalog, shifts, attachments
+├── docs/                   # ALL guides (CLOUD_LOCAL_BRIDGE, DASHBOARD, …)
+├── scripts/                # bootstrap_and_run, run_local, probes
+├── tests/
 ├── config.example.yaml
 ├── .env.example
 └── requirements.txt

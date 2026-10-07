@@ -3,29 +3,74 @@
 from __future__ import annotations
 
 import base64
+import hmac
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
-from berichtsheft import catalog, db, orchestrator
+from berichtsheft import catalog, db, orchestrator, sync_bridge
 from berichtsheft.ai_gemini import is_enabled as gemini_enabled
 from berichtsheft.ai_vision import analyze_image, is_vision_enabled
 from berichtsheft.blok_gaps import format_telegram_report, scan_weeks
 from berichtsheft.blok_upload import upload_attachments_for_date
 from berichtsheft.blok_worker import run_worker
-from berichtsheft.config_loader import ROOT, load_config
+from berichtsheft.config_loader import ROOT, load_config, load_dotenv
 from berichtsheft.cursor_agent import is_available as cursor_available, run_agent_prompt
 from berichtsheft.dashboard import mount_dashboard
 from berichtsheft.whatsapp_bot import handle_incoming_text, parse_waha_webhook
 
-app = FastAPI(title="Berichtsheft-Sync API", version="0.4.0")
+app = FastAPI(title="Berichtsheft-Sync API", version="0.5.0")
 
 ATTACHMENTS_DIR = ROOT / "data" / "attachments"
 
 mount_dashboard(app)
+
+
+def _require_sync_token(
+    request: Request,
+    x_sync_token: Optional[str] = Header(default=None),
+    x_dashboard_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+) -> None:
+    """Require SYNC_TOKEN or DASHBOARD_TOKEN for /sync/* (no open DB exposure)."""
+    load_dotenv()
+    expected = sync_bridge.sync_token()
+    if not expected:
+        raise HTTPException(
+            503,
+            "Sync disabled until SYNC_TOKEN or DASHBOARD_TOKEN is set in .env "
+            "(never expose SQLite without a token). See docs/CLOUD_LOCAL_BRIDGE.md",
+        )
+    provided = ""
+    for candidate in (
+        (x_sync_token or "").strip(),
+        (x_dashboard_token or "").strip(),
+        "",
+        (token or "").strip(),
+    ):
+        if candidate:
+            provided = candidate
+            break
+    if not provided and authorization:
+        parts = authorization.strip().split(None, 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            provided = parts[1].strip()
+    if not provided:
+        cookie = (request.cookies.get("bh_dashboard_token") or "").strip()
+        if cookie:
+            provided = cookie
+    a = provided.encode("utf-8")
+    b = expected.encode("utf-8")
+    if len(a) != len(b) or not hmac.compare_digest(a, b):
+        raise HTTPException(
+            401,
+            "Sync token required (Authorization: Bearer, X-Sync-Token, "
+            "X-Dashboard-Token, or ?token=)",
+        )
 
 
 class LogBody(BaseModel):
@@ -68,6 +113,15 @@ class WeekScanBody(BaseModel):
     offsets: Optional[list[int]] = None
 
 
+class SyncPushBody(BaseModel):
+    schema_version: Optional[int] = None
+    exported_at: Optional[str] = None
+    source: Optional[str] = None
+    counts: Optional[dict[str, Any]] = None
+    data: dict[str, Any] = Field(default_factory=dict)
+    mode: str = "merge"
+
+
 def _conn():
     conn = db.connect()
     db.init_schema(conn)
@@ -84,7 +138,94 @@ def health():
         "gemini": gemini_enabled(),
         "vision": is_vision_enabled(),
         "cursor": cursor_available(),
+        "sync": True,
     }
+
+
+@app.get("/sync/status")
+def sync_status(
+    request: Request,
+    x_sync_token: Optional[str] = Header(default=None),
+    x_dashboard_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+):
+    _require_sync_token(
+        request,
+        x_sync_token=x_sync_token,
+        x_dashboard_token=x_dashboard_token,
+        authorization=authorization,
+        token=token,
+    )
+    conn = _conn()
+    try:
+        return sync_bridge.status_summary(conn)
+    finally:
+        conn.close()
+
+
+@app.get("/sync/pull")
+def sync_pull(
+    request: Request,
+    include: Optional[str] = Query(
+        default=None,
+        description="Comma list: shifts,work_logs,drafts,approvals,katalog,attachments",
+    ),
+    include_files: bool = Query(default=False),
+    x_sync_token: Optional[str] = Header(default=None),
+    x_dashboard_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+):
+    """Export local SQLite + katalog JSON (authenticated). Mac = source of truth."""
+    _require_sync_token(
+        request,
+        x_sync_token=x_sync_token,
+        x_dashboard_token=x_dashboard_token,
+        authorization=authorization,
+        token=token,
+    )
+    parts = [p.strip() for p in (include or "").split(",") if p.strip()] or None
+    conn = _conn()
+    try:
+        return sync_bridge.build_export_payload(
+            conn,
+            include=parts,
+            include_attachment_files=include_files,
+        )
+    finally:
+        conn.close()
+
+
+@app.post("/sync/push")
+def sync_push(
+    body: SyncPushBody,
+    request: Request,
+    x_sync_token: Optional[str] = Header(default=None),
+    x_dashboard_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+):
+    """Import a sync payload into local DB (authenticated). Use from Cloud → Mac."""
+    _require_sync_token(
+        request,
+        x_sync_token=x_sync_token,
+        x_dashboard_token=x_dashboard_token,
+        authorization=authorization,
+        token=token,
+    )
+    mode = (body.mode or "merge").strip().lower()
+    if mode not in ("merge", "replace"):
+        raise HTTPException(400, "mode must be merge or replace")
+    payload = body.model_dump()
+    conn = _conn()
+    try:
+        stats = sync_bridge.apply_import_payload(conn, payload, mode=mode)
+    except ValueError as e:
+        conn.close()
+        raise HTTPException(400, str(e)) from e
+    conn.close()
+    return {"ok": True, "stats": stats}
 
 
 @app.post("/whatsapp/webhook")

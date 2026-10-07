@@ -4,10 +4,12 @@
 
 | Mesin | Peran | Terhubung ke DB Berichtsheft? |
 |-------|--------|-------------------------------|
-| **PC kantor + Cursor Cloud** | Edit kode / katalog kegiatan | **Tidak** — dan **tidak perlu** |
-| **MacBook (rumah / pribadi)** | Stasiun robot: SQLite, Telegram bot, Playwright BLok, Keychain | **Ya** — satu-satunya |
+| **PC kantor + Cursor Cloud** | Edit kode / katalog kegiatan | Default **tidak** (git saja) |
+| **MacBook (rumah / pribadi)** | Stasiun robot: SQLite, Telegram bot, Playwright BLok, Keychain | **Ya** — sumber kebenaran |
 
-Anda **tidak** perlu menyambungkan PC kantor ke MacBook, VPN, Tailscale, atau port-forward. Itu yang ribet dan bisa menyentuh kebijakan IT.
+Default: Anda **tidak** perlu VPN/Tailscale hanya untuk edit katalog — cukup GitHub.
+
+Jika Cloud perlu menulis ke DB Mac (log/draft live), gunakan jembatan ber-token: [CLOUD_LOCAL_BRIDGE.md](CLOUD_LOCAL_BRIDGE.md) (Cloudflare Tunnel / Tailscale + `DASHBOARD_TOKEN` / `/sync/*`). Jangan share file `.db` terbuka.
 
 ---
 
