@@ -52,6 +52,42 @@
       ]
     },
     {
+      "blok_name": "Rezeption",
+      "description_de": "Rezeption / Empfang (Check-in, Check-out, Reservierung)",
+      "codes": [
+        {
+          "code": "Rezeption",
+          "aliases": ["Rez"],
+          "name_de": "Rezeption / Empfang",
+          "department": "Rezeption",
+          "lernfeld": "Gästeservice und Kommunikation / Empfang",
+          "keywords": [
+            "rezeption",
+            "empfang",
+            "check-in",
+            "check-out",
+            "reservierung",
+            "gäste",
+            "telefon",
+            "rez"
+          ],
+          "default_activities_de": [
+            "Empfangsdienst mit Check-in, Check-out und Reservierungen"
+          ],
+          "templates_de": [
+            "Gäste am Empfang begrüßen, den Check-in durchführen und die Schlüsselkarte aushändigen.",
+            "Check-out abwickeln, die Rechnung erläutern und offene Posten sachlich mit dem Gast klären.",
+            "Reservierungen aufnehmen, ändern und im System bestätigen sowie die Verfügbarkeit prüfen.",
+            "Telefonate entgegennehmen, Anliegen notieren und an die zuständige Stelle weiterleiten.",
+            "Gästewünsche entgegennehmen (Weckdienst, Taxi, Zusatzartikel) und an die zuständige Abteilung weitergeben.",
+            "Unterstützung bei leichten Aufgaben des Night Audit: Tagesabschluss kontrollieren und offene Buchungen prüfen.",
+            "Schlüsselkarten programmieren, ausgeben und bei Verlust nach den Hausregeln neu erstellen.",
+            "Beschwerden ruhig und sachlich aufnehmen, eine Lösung anbieten und die Schichtleitung informieren."
+          ]
+        }
+      ]
+    },
+    {
       "blok_name": "Housekeeping",
       "description_de": "Housekeeping / Zimmerreinigung",
       "codes": [
