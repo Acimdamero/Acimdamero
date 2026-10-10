@@ -52,6 +52,33 @@ Service / F&B (Frühstück, Restaurant, BAF)
 - Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.
 - Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende.
 
+## Rezeption
+
+Rezeption / Empfang (Check-in, Check-out, Reservierung)
+
+### `Rezeption` — Rezeption / Empfang · alias: `Rez`
+
+| Field | Nilai |
+|-------|-------|
+| Department | Rezeption |
+| Lernfeld | Gästeservice und Kommunikation / Empfang |
+| Keywords | rezeption, empfang, check-in, check-out, reservierung, gäste, telefon, rez |
+
+**Default activities**
+
+- Empfangsdienst mit Check-in, Check-out und Reservierungen
+
+**Template teks Jerman (pool generator)**
+
+- Gäste am Empfang begrüßen, den Check-in durchführen und die Schlüsselkarte aushändigen.
+- Check-out abwickeln, die Rechnung erläutern und offene Posten sachlich mit dem Gast klären.
+- Reservierungen aufnehmen, ändern und im System bestätigen sowie die Verfügbarkeit prüfen.
+- Telefonate entgegennehmen, Anliegen notieren und an die zuständige Stelle weiterleiten.
+- Gästewünsche entgegennehmen (Weckdienst, Taxi, Zusatzartikel) und an die zuständige Abteilung weitergeben.
+- Unterstützung bei leichten Aufgaben des Night Audit: Tagesabschluss kontrollieren und offene Buchungen prüfen.
+- Schlüsselkarten programmieren, ausgeben und bei Verlust nach den Hausregeln neu erstellen.
+- Beschwerden ruhig und sachlich aufnehmen, eine Lösung anbieten und die Schichtleitung informieren.
+
 ## Housekeeping
 
 Housekeeping / Zimmerreinigung

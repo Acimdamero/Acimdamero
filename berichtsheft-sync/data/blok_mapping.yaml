@@ -18,6 +18,8 @@ abteilung:
   default: ""
   BRF: Service
   BAF: Service
+  Rezeption: Rezeption
+  Rez: Rezeption
   HK: Housekeeping
   Housekeeping: Housekeeping
   Tagungen: Tagungen
