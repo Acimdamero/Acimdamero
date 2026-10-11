@@ -1,6 +1,7 @@
 (() => {
   const TITLES = {
     overview: "Overview",
+    hari: "Hari & BLok",
     live: "Live feed",
     katalog: "Katalog / Abteilung",
     shifts: "Jadwal / Shifts",
@@ -77,6 +78,7 @@
   async function loadPanel(name) {
     try {
       if (name === "overview") await loadHealth();
+      if (name === "hari") await loadHari();
       if (name === "live") await loadLive();
       if (name === "katalog") await loadCatalog();
       if (name === "shifts") await loadShiftsTable();
@@ -593,6 +595,471 @@
       <p class="hint">${esc(wa.open_hint)}</p>
       <p class="hint">Docs: <code>${esc(wa.docs)}</code></p>`;
   }
+
+  const HARI_MONTHS = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+  ];
+  let hariActiveDate = "";
+  const hariComposer = new Map();
+
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function isoFromDate(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function parseIso(iso) {
+    const [year, month, day] = iso.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  function shiftIso(iso, days) {
+    const d = parseIso(iso);
+    d.setDate(d.getDate() + days);
+    return isoFromDate(d);
+  }
+
+  function clampIso(year, month, day) {
+    const last = new Date(year, month, 0).getDate();
+    const clamped = Math.min(Math.max(day, 1), last);
+    return `${year}-${pad2(month)}-${pad2(clamped)}`;
+  }
+
+  function clockLabel(start, end) {
+    if (!start || !end) return null;
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
+    let mins = eh * 60 + em - (sh * 60 + sm);
+    if (mins < 0) mins += 24 * 60;
+    return `${Math.floor(mins / 60)}h:${pad2(mins % 60)}min`;
+  }
+
+  function withToken(url) {
+    if (!url) return "";
+    const u = new URL(url, window.location.origin);
+    const token = tokenInput.value.trim();
+    if (token) u.searchParams.set("token", token);
+    u.searchParams.set("t", String(Date.now()));
+    return `${u.pathname}${u.search}`;
+  }
+
+  function rememberComposer() {
+    if (!hariActiveDate) return;
+    hariComposer.set(hariActiveDate, document.getElementById("hari-composer").value);
+  }
+
+  function paintDuration() {
+    const start = document.getElementById("hari-start").value;
+    const end = document.getElementById("hari-end").value;
+    const clock = clockLabel(start, end);
+    const blok = document.getElementById("hari-duration").dataset.blok || "";
+    const parts = [clock ? `Durasi ${clock}` : "Durasi —"];
+    if (blok) parts.push(`BLok ${blok}`);
+    document.getElementById("hari-duration").textContent = parts.join(" · ");
+  }
+
+  function syncHariParts(iso) {
+    const d = parseIso(iso);
+    document.getElementById("hari-month").value = String(d.getMonth() + 1);
+    const yearSel = document.getElementById("hari-year");
+    const year = String(d.getFullYear());
+    if (![...yearSel.options].some((opt) => opt.value === year)) {
+      const extra = document.createElement("option");
+      extra.value = year;
+      extra.textContent = year;
+      yearSel.appendChild(extra);
+    }
+    yearSel.value = year;
+  }
+
+  function initHariControls() {
+    const month = document.getElementById("hari-month");
+    HARI_MONTHS.forEach((name, index) => {
+      const opt = document.createElement("option");
+      opt.value = String(index + 1);
+      opt.textContent = name;
+      month.appendChild(opt);
+    });
+    const yearSel = document.getElementById("hari-year");
+    const today = new Date();
+    for (let year = today.getFullYear() - 2; year <= today.getFullYear() + 2; year += 1) {
+      const opt = document.createElement("option");
+      opt.value = String(year);
+      opt.textContent = String(year);
+      yearSel.appendChild(opt);
+    }
+    const iso = isoFromDate(today);
+    document.getElementById("hari-date").value = iso;
+    syncHariParts(iso);
+  }
+
+  function renderPhrases(groups) {
+    const root = document.getElementById("hari-phrases");
+    root.replaceChildren();
+    if (!groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Tidak ada frasa katalog untuk tanggal ini.";
+      root.appendChild(empty);
+      return;
+    }
+    groups.forEach((group) => {
+      const block = document.createElement("div");
+      const title = document.createElement("div");
+      title.className = "phrase-group-title";
+      const dayMark = group.for_day ? " · hari ini" : "";
+      title.textContent = `${group.symbol} ${group.code}${group.name_de ? " — " + group.name_de : ""}${dayMark}`;
+      const row = document.createElement("div");
+      row.className = "phrase-row";
+      (group.buttons || []).forEach((button) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "phrase-btn";
+        el.title = button.text || "";
+        const sym = document.createElement("span");
+        sym.className = "sym";
+        sym.textContent = group.symbol || "✦";
+        const label = document.createElement("span");
+        label.textContent = button.label || button.kind || "Frasa";
+        el.append(sym, label);
+        el.addEventListener("click", () => {
+          const box = document.getElementById("hari-composer");
+          const text = (button.text || "").trim();
+          if (!text) return;
+          const current = box.value;
+          if (!current.trim()) box.value = text;
+          else if (current.endsWith("\n")) box.value = current + text;
+          else box.value = `${current}\n${text}`;
+          if (hariActiveDate) hariComposer.set(hariActiveDate, box.value);
+          box.focus();
+        });
+        row.appendChild(el);
+      });
+      block.append(title, row);
+      root.appendChild(block);
+    });
+  }
+
+  function renderThumbs(attachments) {
+    const root = document.getElementById("hari-thumbs");
+    root.replaceChildren();
+    const photos = (attachments || []).filter((item) => item.media_url || item.blok_status);
+    if (!photos.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Belum ada foto untuk tanggal ini.";
+      root.appendChild(empty);
+      return;
+    }
+    photos.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "hari-thumb";
+      if (item.media_url) {
+        const img = document.createElement("img");
+        img.alt = item.caption || `Foto ${item.id}`;
+        img.src = withToken(item.media_url);
+        card.appendChild(img);
+      }
+      const cap = document.createElement("span");
+      cap.textContent = item.blok_status || "lokal";
+      card.appendChild(cap);
+      root.appendChild(card);
+    });
+  }
+
+  function renderPreview(data) {
+    const preview = data.preview || {};
+    const draftEl = document.getElementById("hari-draft-text");
+    const empty = document.getElementById("hari-preview-empty");
+    const frame = document.getElementById("hari-preview-frame");
+    const shot = document.getElementById("hari-preview-shot");
+    if (preview.draft_text) {
+      const head = [
+        preview.ort ? `Ort: ${preview.ort}` : "",
+        preview.hours ? `Zeit: ${preview.hours}` : "",
+        preview.draft_status ? `Status: ${preview.draft_status}` : "",
+      ].filter(Boolean);
+      draftEl.textContent = head.length
+        ? `${head.join("\n")}\n\n${preview.draft_text}`
+        : preview.draft_text;
+    } else {
+      draftEl.textContent = "Belum ada draft Jerman untuk tanggal ini.";
+    }
+    if (preview.html_url) {
+      frame.classList.remove("hidden");
+      empty.classList.add("hidden");
+      frame.src = withToken(preview.html_url);
+    } else {
+      frame.classList.add("hidden");
+      frame.removeAttribute("src");
+      empty.classList.remove("hidden");
+      empty.textContent = "Belum ada preview untuk tanggal ini. Simpan log, lalu Buat draft atau Isi BLok (dry-run).";
+    }
+    if (preview.screenshot_url) {
+      shot.classList.remove("hidden");
+      shot.src = withToken(preview.screenshot_url);
+      empty.classList.add("hidden");
+    } else {
+      shot.classList.add("hidden");
+      shot.removeAttribute("src");
+    }
+  }
+
+  function renderHari(data) {
+    hariActiveDate = data.date;
+    document.getElementById("hari-date").value = data.date;
+    syncHariParts(data.date);
+    document.getElementById("hari-weekday").textContent =
+      `${data.weekday_id || ""} · ${data.weekday_de || ""}`.trim();
+    const hours = data.hours || {};
+    document.getElementById("hari-start").value = (hours.start_time || "").slice(0, 5);
+    document.getElementById("hari-end").value = (hours.end_time || "").slice(0, 5);
+    document.getElementById("hari-type").value = hours.day_type || "arbeit";
+    document.getElementById("hari-duration").dataset.blok = hours.blok_label || "";
+    paintDuration();
+
+    const creds = Boolean(data.blok && data.blok.credentials_present);
+    const banner = document.getElementById("hari-banner");
+    banner.className = `banner ${creds ? "ok" : "warn"}`;
+    document.getElementById("hari-banner-title").textContent = creds
+      ? "Kredensial BLok ada"
+      : "Kredensial BLok belum ada";
+    document.getElementById("hari-banner-detail").textContent = creds
+      ? "Isi BLok live bisa mengirim. Dry-run tetap tersedia."
+      : "Isi hari tetap tersimpan + dry-run. Live menunggu BLOK_USERNAME/PASSWORD atau Keychain.";
+
+    const logs = data.work_logs || [];
+    const logRoot = document.getElementById("hari-logs");
+    logRoot.innerHTML = logs.length
+      ? logs
+          .map(
+            (row) =>
+              `<div class="feed-item"><div class="meta">${esc(row.created_at || "")} · ${esc(row.source || "")}</div>${esc(row.content)}</div>`
+          )
+          .join("")
+      : `<div class="feed-item"><span class="hint">Belum ada catatan untuk hari ini.</span></div>`;
+
+    renderPhrases(data.phrases || []);
+    document.getElementById("hari-composer").value = hariComposer.get(data.date) || "";
+    renderThumbs(data.attachments || []);
+    renderPreview(data);
+
+    const liveBtn = document.getElementById("hari-live");
+    liveBtn.disabled = !creds;
+    liveBtn.title = creds
+      ? "Kirim hari ini ke BLok"
+      : "Live nonaktif sampai kredensial BLok ada. Dry-run tetap menyimpan draft.";
+    statusPill.textContent = creds ? "BLok live siap" : "dry-run";
+    statusPill.className = creds ? "pill ok" : "pill warn";
+  }
+
+  function showHariStatus(data) {
+    const label = data.status_label || "";
+    if (!label) return;
+    const banner = document.getElementById("hari-banner");
+    const live = label === "live terkirim";
+    banner.className = `banner ${live ? "ok" : "warn"}`;
+    document.getElementById("hari-banner-title").textContent = label;
+    let detail = data.message || "";
+    if (data.fallback_dry_run) {
+      detail = "Kredensial live tidak dipakai. Preview dry-run lokal.";
+    }
+    if (data.live_error) detail = `Live gagal: ${data.live_error}. ${label}`;
+    document.getElementById("hari-banner-detail").textContent = detail || label;
+    setMsg("hari-msg", detail && detail !== label ? `${label} — ${detail}` : label, live || !data.live_error);
+  }
+
+  async function loadHari(iso) {
+    const date = iso || hariActiveDate || document.getElementById("hari-date").value || isoFromDate(new Date());
+    hariActiveDate = date;
+    document.getElementById("hari-date").value = date;
+    const data = await api(`/dashboard/api/day?date=${encodeURIComponent(date)}`);
+    renderHari(data);
+    return data;
+  }
+
+  async function gotoHari(iso) {
+    rememberComposer();
+    hariActiveDate = iso;
+    document.getElementById("hari-date").value = iso;
+    syncHariParts(iso);
+    return loadHari(iso);
+  }
+
+  function jumpHariMonth() {
+    const iso = hariActiveDate || document.getElementById("hari-date").value || isoFromDate(new Date());
+    const day = Number(iso.slice(8, 10)) || 1;
+    const year = Number(document.getElementById("hari-year").value);
+    const month = Number(document.getElementById("hari-month").value);
+    return gotoHari(clampIso(year, month, day));
+  }
+
+  async function postHari(path, body) {
+    const data = await api(path, { method: "POST", body: JSON.stringify(body) });
+    if (data.day) renderHari(data.day);
+    else await loadHari(body.date || hariActiveDate);
+    showHariStatus(data);
+    return data;
+  }
+
+  initHariControls();
+  document.getElementById("hari-prev").addEventListener("click", () => {
+    const iso = hariActiveDate || document.getElementById("hari-date").value;
+    gotoHari(shiftIso(iso, -1)).catch(showErr);
+  });
+  document.getElementById("hari-next").addEventListener("click", () => {
+    const iso = hariActiveDate || document.getElementById("hari-date").value;
+    gotoHari(shiftIso(iso, 1)).catch(showErr);
+  });
+  document.getElementById("hari-date").addEventListener("change", () => {
+    const next = document.getElementById("hari-date").value;
+    if (!next) return;
+    rememberComposer();
+    hariActiveDate = next;
+    syncHariParts(next);
+    loadHari(next).catch(showErr);
+  });
+  document.getElementById("hari-month").addEventListener("change", () => {
+    jumpHariMonth().catch(showErr);
+  });
+  document.getElementById("hari-year").addEventListener("change", () => {
+    jumpHariMonth().catch(showErr);
+  });
+  document.getElementById("hari-start").addEventListener("input", paintDuration);
+  document.getElementById("hari-end").addEventListener("input", paintDuration);
+  document.getElementById("hari-composer").addEventListener("input", () => {
+    if (hariActiveDate) {
+      hariComposer.set(hariActiveDate, document.getElementById("hari-composer").value);
+    }
+  });
+  document.getElementById("hari-save-hours").addEventListener("click", async () => {
+    try {
+      const start = document.getElementById("hari-start").value;
+      const end = document.getElementById("hari-end").value;
+      if (!start || !end) {
+        setMsg("hari-msg", "Isi jam mulai dan selesai.", false);
+        return;
+      }
+      await api("/dashboard/api/day/hours", {
+        method: "PUT",
+        body: JSON.stringify({
+          date: hariActiveDate,
+          start_time: start,
+          end_time: end,
+          day_type: document.getElementById("hari-type").value,
+        }),
+      });
+      await loadHari(hariActiveDate);
+      setMsg("hari-msg", "Jam tersimpan.", true);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-save-log").addEventListener("click", async () => {
+    try {
+      const text = document.getElementById("hari-composer").value.trim();
+      if (!text) {
+        setMsg("hari-msg", "Tulis catatan atau klik frasa dulu.", false);
+        return;
+      }
+      await api("/dashboard/api/day/log", {
+        method: "POST",
+        body: JSON.stringify({ date: hariActiveDate, text }),
+      });
+      hariComposer.set(hariActiveDate, "");
+      await loadHari(hariActiveDate);
+      setMsg("hari-msg", "Log tersimpan.", true);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-draft").addEventListener("click", async () => {
+    try {
+      await postHari("/dashboard/api/day/draft", {
+        date: hariActiveDate,
+        start_time: document.getElementById("hari-start").value || null,
+        end_time: document.getElementById("hari-end").value || null,
+        day_type: document.getElementById("hari-type").value,
+      });
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-dry").addEventListener("click", async () => {
+    try {
+      await postHari("/dashboard/api/day/fill", {
+        date: hariActiveDate,
+        mode: "dry_run",
+        start_time: document.getElementById("hari-start").value || null,
+        end_time: document.getElementById("hari-end").value || null,
+        day_type: document.getElementById("hari-type").value,
+      });
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-live").addEventListener("click", async () => {
+    try {
+      await postHari("/dashboard/api/day/fill", {
+        date: hariActiveDate,
+        mode: "live",
+        start_time: document.getElementById("hari-start").value || null,
+        end_time: document.getElementById("hari-end").value || null,
+        day_type: document.getElementById("hari-type").value,
+      });
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-photo").addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Gagal baca foto"));
+        reader.readAsDataURL(file);
+      });
+      const saved = await api("/dashboard/api/day/photo", {
+        method: "POST",
+        body: JSON.stringify({
+          date: hariActiveDate,
+          filename: file.name,
+          mime_type: file.type || "image/jpeg",
+          image_base64: dataUrl,
+        }),
+      });
+      await loadHari(hariActiveDate);
+      showHariStatus(saved);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-upload-blok").addEventListener("click", async () => {
+    try {
+      const data = await api("/dashboard/api/day/photo/upload-blok", {
+        method: "POST",
+        body: JSON.stringify({ date: hariActiveDate }),
+      });
+      await loadHari(hariActiveDate);
+      showHariStatus(data);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
 
   function setMsg(id, text, ok) {
     const el = document.getElementById(id);

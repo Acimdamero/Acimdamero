@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from berichtsheft import catalog, credentials as cred_mod, db, sync_bridge
+from berichtsheft import catalog, credentials as cred_mod, day_fill, db, sync_bridge
 from berichtsheft.ai_gemini import is_enabled as gemini_enabled
 from berichtsheft.ai_vision import is_vision_enabled
 from berichtsheft.blok_live_snapshot import (
@@ -67,6 +67,49 @@ class SyncRemoteBody(BaseModel):
     remote_api_url: Optional[str] = None
     include_files: bool = False
     mode: str = "merge"
+
+
+class DayLogBody(BaseModel):
+    date: str
+    text: str
+
+
+class DayHoursBody(BaseModel):
+    date: str
+    start_time: str
+    end_time: str
+    day_type: Optional[str] = None
+
+
+class DayDraftBody(BaseModel):
+    date: str
+    summary: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    day_type: Optional[str] = None
+
+
+class DayFillBody(BaseModel):
+    date: str
+    mode: str = "dry_run"
+    summary: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    day_type: Optional[str] = None
+
+
+class DayPhotoBody(BaseModel):
+    date: str
+    image_base64: str
+    mime_type: str = "image/jpeg"
+    filename: Optional[str] = None
+    caption: Optional[str] = None
+
+
+class DayUploadBlokBody(BaseModel):
+    date: str
+    attachment_ids: Optional[list[int]] = None
+    bind: bool = True
 
 
 def _dashboard_token() -> str:
@@ -796,6 +839,174 @@ def dashboard_sync_run(
         raise HTTPException(502, f"sync {direction} gagal: {e}") from e
 
     return {"ok": True, "direction": direction, "result": result}
+
+
+# ── Day fill (Hari & BLok) ──────────────────────────────────────────────────
+
+
+def _day_http(exc: day_fill.DayValidationError) -> HTTPException:
+    return HTTPException(400, str(exc))
+
+
+@router.get("/dashboard/api/day")
+def dashboard_day(
+    date: Optional[str] = Query(default=None),
+    _: None = Depends(require_dashboard_access),
+):
+    try:
+        iso = day_fill.parse_iso_date(date)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    conn = _conn()
+    try:
+        return day_fill.build_day_view(
+            conn,
+            iso,
+            repo_root=ROOT,
+            credentials_present=_blok_credential_status()["credential_resolvable"],
+        )
+    finally:
+        conn.close()
+
+
+@router.post("/dashboard/api/day/log")
+def dashboard_day_log(body: DayLogBody, _: None = Depends(require_dashboard_access)):
+    try:
+        iso = day_fill.parse_iso_date(body.date)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    conn = _conn()
+    try:
+        log_id = day_fill.save_log(conn, iso, body.text)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    finally:
+        conn.close()
+    return {"ok": True, "id": log_id, "date": iso, "source": "dashboard"}
+
+
+@router.put("/dashboard/api/day/hours")
+def dashboard_day_hours(body: DayHoursBody, _: None = Depends(require_dashboard_access)):
+    try:
+        iso = day_fill.parse_iso_date(body.date)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    conn = _conn()
+    try:
+        shift = day_fill.save_hours(
+            conn, iso, body.start_time, body.end_time, body.day_type
+        )
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    finally:
+        conn.close()
+    return {"ok": True, "date": iso, "shift": shift}
+
+
+@router.post("/dashboard/api/day/draft")
+def dashboard_day_draft(body: DayDraftBody, _: None = Depends(require_dashboard_access)):
+    try:
+        iso = day_fill.parse_iso_date(body.date)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    conn = _conn()
+    try:
+        day_fill.apply_optional_hours(
+            conn, iso, body.start_time, body.end_time, body.day_type
+        )
+        result = day_fill.create_draft(conn, iso, body.summary)
+        result["day"] = day_fill.build_day_view(
+            conn,
+            iso,
+            repo_root=ROOT,
+            credentials_present=_blok_credential_status()["credential_resolvable"],
+        )
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    finally:
+        conn.close()
+    return result
+
+
+@router.post("/dashboard/api/day/fill")
+def dashboard_day_fill(body: DayFillBody, _: None = Depends(require_dashboard_access)):
+    try:
+        iso = day_fill.parse_iso_date(body.date)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    creds = _blok_credential_status()
+    conn = _conn()
+    try:
+        day_fill.apply_optional_hours(
+            conn, iso, body.start_time, body.end_time, body.day_type
+        )
+        result = day_fill.fill_day(
+            conn,
+            iso,
+            body.mode,
+            summary=body.summary,
+            credentials_present=bool(creds["credential_resolvable"]),
+        )
+        result["day"] = day_fill.build_day_view(
+            conn,
+            iso,
+            repo_root=ROOT,
+            credentials_present=bool(creds["credential_resolvable"]),
+        )
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    finally:
+        conn.close()
+    return result
+
+
+@router.post("/dashboard/api/day/photo")
+def dashboard_day_photo(body: DayPhotoBody, _: None = Depends(require_dashboard_access)):
+    try:
+        iso = day_fill.parse_iso_date(body.date)
+        saved = None
+        conn = _conn()
+        try:
+            saved = day_fill.save_photo(
+                conn,
+                iso,
+                body.image_base64,
+                mime_type=body.mime_type,
+                filename=body.filename,
+                caption=body.caption,
+                attachments_root=ATTACHMENTS_DIR,
+                repo_root=ROOT,
+            )
+        finally:
+            conn.close()
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    return saved
+
+
+@router.post("/dashboard/api/day/photo/upload-blok")
+def dashboard_day_photo_upload(
+    body: DayUploadBlokBody,
+    _: None = Depends(require_dashboard_access),
+):
+    try:
+        iso = day_fill.parse_iso_date(body.date)
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    creds = _blok_credential_status()
+    conn = _conn()
+    try:
+        return day_fill.upload_photos_to_blok(
+            conn,
+            iso,
+            body.attachment_ids,
+            credentials_present=bool(creds["credential_resolvable"]),
+            bind=body.bind,
+        )
+    except day_fill.DayValidationError as e:
+        raise _day_http(e) from e
+    finally:
+        conn.close()
 
 
 # ── Bots ────────────────────────────────────────────────────────────────────

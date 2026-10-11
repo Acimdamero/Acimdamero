@@ -72,6 +72,7 @@ Jika `DASHBOARD_TOKEN` **kosong**, dashboard terbuka tanpa auth — **hanya** un
 | Panel | Apa yang ditampilkan / diedit |
 |-------|-------------------------------|
 | **Overview** | Health: API, Gemini, Vision, Cursor, Telegram token, WA allowlist, WAHA reachability |
+| **Hari & BLok** | Isi satu hari: pilih tanggal, jam mulai/selesai, frasa katalog, foto, draft, dry-run / live BLok |
 | **Live feed** | Recent `work_logs`, drafts, attachments (+ thumbnail jika file ada di `data/attachments/`) |
 | **Katalog / Abteilung** | Editor JSON untuk `data/katalog_abteilung.json` → Save menulis file + `catalog.sync_to_db` + export legacy |
 | **Jadwal / Shifts** | Tabel SQLite shifts (upsert/delete) + editor sample `data/shifts_kw23_24.json` (save + import DB) |
@@ -110,6 +111,25 @@ BLOK_PASSWORD=...
 
 Tanpa itu, panel tetap menampilkan dry-run + tombol Buka BLok; tombol snapshot mengembalikan error 400 sampai kredensial diisi.
 
+## Isi hari (Hari & BLok)
+
+Sidebar → **Hari & BLok**.
+
+1. Pilih tanggal (‹ Hari / Hari ›, input tanggal, atau loncat bulan/tahun).
+2. Isi **Mulai** / **Selesai**. Label durasi mengikuti jam shift; label **BLok** memakai aturan yang sama dengan worker (`8h:00min`, atau jam aktual jika log menyebut lembur). **Simpan jam** menulis `shifts`.
+3. Kolom chat menampilkan `work_logs` hari itu. Tombol simbol (Rezeption, BRF, Housekeeping, Tagungen, Schule, plus kode Abteilung hari itu) menempel kalimat Jerman dari `conditions` / `templates_de`. **Simpan log** menyimpan teks ke `work_logs`.
+4. **Tambah foto** menyimpan file lewat alur attachment (`data/attachments/{tanggal}/`) dan menampilkan thumbnail hari itu. **Upload ke BLok** memakai upload yang sama dengan `POST /attachments/upload-blok`. Tanpa kredensial live, file tetap lokal dan statusnya **upload pending**.
+5. **Buat draft** memanggil `orchestrator.finish_day`. **Isi BLok (dry-run)** menyimpan draft lalu `blok_worker` dry-run → `output/blok_dry_run/{tanggal}.html` (iframe di panel preview). **Isi BLok live** hanya aktif jika `BLOK_USERNAME`/`BLOK_PASSWORD` atau Keychain/secrets sudah ada. Kalau tidak ada, isi tetap **tersimpan + dry-run** — kredensial tidak dibuat otomatis.
+
+Status yang ditampilkan:
+
+| Status | Arti |
+|--------|------|
+| `tersimpan` | Draft lokal, belum dry-run |
+| `tersimpan + dry-run` | Draft + HTML preview. Juga dipakai jika live diminta tanpa kredensial |
+| `live terkirim` | Worker live selesai dengan kredensial yang sudah ada |
+| `upload pending` | Foto tersimpan lokal; upload BLok menunggu kredensial |
+
 ## Edit katalog dari UI
 
 1. Sidebar → **Katalog / Abteilung**
@@ -132,6 +152,10 @@ python3 -m berichtsheft catalog --reload --write-md
 
 Semua di bawah `/dashboard/api/…` (auth sama seperti di atas):
 
+- `GET /dashboard/api/day?date=YYYY-MM-DD`
+- `POST /dashboard/api/day/log` · `PUT /dashboard/api/day/hours`
+- `POST /dashboard/api/day/draft` · `POST /dashboard/api/day/fill` (`mode`: `dry_run` atau `live`)
+- `POST /dashboard/api/day/photo` · `POST /dashboard/api/day/photo/upload-blok`
 - `GET /dashboard/api/health`
 - `GET /dashboard/api/live`
 - `GET|PUT /dashboard/api/catalog`
