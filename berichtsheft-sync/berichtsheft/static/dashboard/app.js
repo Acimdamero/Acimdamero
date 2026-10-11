@@ -657,9 +657,10 @@
     const end = document.getElementById("hari-end").value;
     const clock = clockLabel(start, end);
     const blok = document.getElementById("hari-duration").dataset.blok || "";
-    const parts = [clock ? `Durasi ${clock}` : "Durasi —"];
-    if (blok) parts.push(`BLok ${blok}`);
-    document.getElementById("hari-duration").textContent = parts.join(" · ");
+    const clockText = clock || "—";
+    let text = `Durasi ${clockText}`;
+    if (blok && blok !== clock) text += ` · BLok ${blok}`;
+    document.getElementById("hari-duration").textContent = text;
   }
 
   function syncHariParts(iso) {
