@@ -102,6 +102,21 @@ python3 -m berichtsheft bot
 
 ---
 
+## Fase 5b — WhatsApp bot (opsional, nomor personal via WAHA)
+
+Detail lengkap: [`docs/WHATSAPP.md`](WHATSAPP.md)
+
+| # | Tindakan |
+|---|----------|
+| 5b.1 | Jalankan WAHA: `docker compose -f mac-iphone-automation/docker/docker-compose.waha.yml up -d` → scan QR di http://localhost:3000 |
+| 5b.2 | Di `.env`: isi `WHATSAPP_ALLOWED_NUMBER=` (nomor Anda, tanpa `+`), plus `WAHA_*` |
+| 5b.3 | Terminal A: `python3 -m berichtsheft serve` |
+| 5b.4 | Terminal B: `python3 -m berichtsheft wa-bot` |
+| 5b.5 | Cek: `python3 -m berichtsheft wa-check` · `python3 -m berichtsheft wa-menu-push` |
+| 5b.6 | Di WhatsApp: kirim `menu` / `1` / teks kegiatan |
+
+---
+
 ## Fase 6 — BLok live (hati-hati, setelah dry-run OK)
 
 | # | Perintah |

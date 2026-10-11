@@ -1,0 +1,1108 @@
+(() => {
+  const TITLES = {
+    overview: "Overview",
+    hari: "Hari & BLok",
+    live: "Live feed",
+    katalog: "Katalog / Abteilung",
+    shifts: "Jadwal / Shifts",
+    school: "Sekolah / Templates",
+    blok: "BLok Live",
+    sync: "Cloud ↔ Mac",
+    bots: "Bots",
+  };
+
+  const tokenInput = document.getElementById("dash-token");
+  const statusPill = document.getElementById("status-pill");
+  const panelTitle = document.getElementById("panel-title");
+
+  // Prefer ?token= / ?DASHBOARD_TOKEN= from phone-friendly share URL, then localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlToken = (urlParams.get("token") || urlParams.get("DASHBOARD_TOKEN") || "").trim();
+  if (urlToken) {
+    tokenInput.value = urlToken;
+    localStorage.setItem("bh_dash_token", urlToken);
+  } else {
+    tokenInput.value = localStorage.getItem("bh_dash_token") || "";
+  }
+  tokenInput.addEventListener("change", () => {
+    localStorage.setItem("bh_dash_token", tokenInput.value.trim());
+  });
+
+  function headers(json = false) {
+    const h = {};
+    if (json) h["Content-Type"] = "application/json";
+    const t = tokenInput.value.trim();
+    if (t) {
+      h["X-Dashboard-Token"] = t;
+      h["Authorization"] = `Bearer ${t}`;
+    }
+    return h;
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      ...opts,
+      headers: { ...headers(Boolean(opts.body)), ...(opts.headers || {}) },
+    });
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw: text };
+    }
+    if (!res.ok) {
+      const msg = data.detail || data.error || res.statusText || "error";
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    }
+    return data;
+  }
+
+  function showPanel(name) {
+    document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+    document.querySelectorAll("#nav button").forEach((b) => b.classList.remove("active"));
+    document.getElementById(`panel-${name}`).classList.add("active");
+    document.querySelector(`#nav button[data-panel="${name}"]`).classList.add("active");
+    panelTitle.textContent = TITLES[name] || name;
+    loadPanel(name);
+  }
+
+  document.querySelectorAll("#nav button").forEach((btn) => {
+    btn.addEventListener("click", () => showPanel(btn.dataset.panel));
+  });
+  document.getElementById("btn-refresh").addEventListener("click", () => {
+    const active = document.querySelector("#nav button.active");
+    loadPanel(active ? active.dataset.panel : "overview");
+  });
+
+  async function loadPanel(name) {
+    try {
+      if (name === "overview") await loadHealth();
+      if (name === "hari") await loadHari();
+      if (name === "live") await loadLive();
+      if (name === "katalog") await loadCatalog();
+      if (name === "shifts") await loadShiftsTable();
+      if (name === "school") await loadSchool();
+      if (name === "blok") await loadBlok();
+      if (name === "sync") await loadSync();
+      if (name === "bots") await loadBots();
+    } catch (e) {
+      statusPill.textContent = e.message;
+      statusPill.className = "pill warn";
+    }
+  }
+
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  async function loadHealth() {
+    const h = await api("/dashboard/api/health");
+    statusPill.textContent = h.ok ? "API OK" : "degraded";
+    statusPill.className = h.ok ? "pill ok" : "pill warn";
+    document.getElementById("auth-note").textContent = h.auth_note || "";
+
+    const cells = [
+      ["API", true, true],
+      ["Gemini key", h.gemini_key_present, h.gemini_enabled],
+      ["Vision", h.vision_enabled, h.vision_enabled],
+      ["Cursor", h.cursor_available, h.cursor_available],
+      ["Telegram token", h.telegram_token_present, h.telegram_token_present],
+      ["TG chat saved", h.telegram_chat_id_saved, h.telegram_chat_id_saved],
+      ["WA allowlist", h.whatsapp_allowlist_set, h.whatsapp_allowlist_set],
+      ["WA chat saved", h.whatsapp_chat_id_saved, h.whatsapp_chat_id_saved],
+      ["WAHA", Boolean(h.waha && h.waha.ok), Boolean(h.waha && h.waha.ok)],
+      ["Token required", h.dashboard_token_required, true],
+    ];
+
+    const grid = document.getElementById("health-grid");
+    grid.innerHTML = cells
+      .map(([label, present, ok]) => {
+        const cls = ok ? "ok" : "bad";
+        const val = present ? "yes" : "no";
+        return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${cls}">${val}</div></div>`;
+      })
+      .join("");
+
+    if (h.waha && !h.waha.ok && h.waha.error) {
+      grid.insertAdjacentHTML(
+        "beforeend",
+        `<div class="stat"><div class="label">WAHA detail</div><div class="value" style="font-size:0.8rem;font-weight:400;color:var(--muted)">${esc(h.waha.error)}</div></div>`
+      );
+    }
+  }
+
+  async function loadLive() {
+    const data = await api("/dashboard/api/live?limit=30");
+    const logs = document.getElementById("live-logs");
+    logs.innerHTML = (data.work_logs || [])
+      .map(
+        (r) => `<div class="feed-item"><div class="meta">${esc(r.date)} · ${esc(r.source)} · ${esc(r.created_at)}</div>${esc(r.content)}</div>`
+      )
+      .join("") || '<div class="feed-item meta">Belum ada work log</div>';
+
+    document.getElementById("live-drafts").innerHTML =
+      (data.drafts || [])
+        .map(
+          (r) =>
+            `<div class="feed-item"><div class="meta">${esc(r.date)} · ${esc(r.status)} · ${esc(r.ort)}</div>${esc((r.taetigkeiten || "").slice(0, 280))}</div>`
+        )
+        .join("") || '<div class="feed-item meta">Belum ada draft</div>';
+
+    document.getElementById("live-atts").innerHTML =
+      (data.attachments || [])
+        .map((r) => {
+          const img = r.media_url
+            ? `<img src="${esc(r.media_url)}" alt="attachment ${esc(r.id)}" loading="lazy" />`
+            : `<span class="meta">file missing</span>`;
+          return `<div class="feed-item"><div class="meta">#${esc(r.id)} · ${esc(r.date)} · ${esc(r.vision_mode || r.kind)}</div>${esc(r.caption || r.path)}${img}</div>`;
+        })
+        .join("") || '<div class="feed-item meta">Belum ada lampiran</div>';
+  }
+
+  async function loadCatalog() {
+    const data = await api("/dashboard/api/catalog");
+    document.getElementById("katalog-editor").value = JSON.stringify(data.katalog, null, 2);
+    setMsg("katalog-msg", `Loaded ${data.path}`, true);
+  }
+
+  document.getElementById("btn-cat-reload").addEventListener("click", () => loadCatalog().catch(showErr));
+  document.getElementById("btn-cat-save").addEventListener("click", async () => {
+    try {
+      const katalog = JSON.parse(document.getElementById("katalog-editor").value);
+      const res = await api("/dashboard/api/catalog", {
+        method: "PUT",
+        body: JSON.stringify({ katalog, sync_db: true, export_legacy: true, write_md: false }),
+      });
+      setMsg(
+        "katalog-msg",
+        `Saved ${res.path}` + (res.sync ? `\nSync: ${JSON.stringify(res.sync)}` : ""),
+        true
+      );
+    } catch (e) {
+      setMsg("katalog-msg", e.message, false);
+    }
+  });
+
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      const which = tab.dataset.shiftTab;
+      document.getElementById("shifts-table-wrap").classList.toggle("hidden", which !== "table");
+      document.getElementById("shifts-json-wrap").classList.toggle("hidden", which !== "json");
+      if (which === "json") loadShiftsJson().catch(showErr);
+      else loadShiftsTable().catch(showErr);
+    });
+  });
+
+  async function loadShiftsTable() {
+    const data = await api("/dashboard/api/shifts?limit=120");
+    const tbody = document.querySelector("#shifts-table tbody");
+    tbody.innerHTML = (data.shifts || [])
+      .map((s) => {
+        const tags = (s.tags || []).join(", ");
+        return `<tr>
+          <td>${esc(s.date)}</td>
+          <td>${esc(s.day_type)}</td>
+          <td>${esc(s.start_time || "")}</td>
+          <td>${esc(s.end_time || "")}</td>
+          <td>${esc(tags)}</td>
+          <td><button type="button" class="danger" data-del="${esc(s.date)}">Del</button></td>
+        </tr>`;
+      })
+      .join("");
+    tbody.querySelectorAll("button[data-del]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm(`Hapus shift ${btn.dataset.del}?`)) return;
+        try {
+          await api(`/dashboard/api/shifts/${btn.dataset.del}`, { method: "DELETE" });
+          await loadShiftsTable();
+        } catch (e) {
+          setMsg("shift-msg", e.message, false);
+        }
+      });
+    });
+  }
+
+  document.getElementById("btn-shift-reload").addEventListener("click", () =>
+    loadShiftsTable().catch(showErr)
+  );
+  document.getElementById("btn-shift-save").addEventListener("click", async () => {
+    try {
+      const tags = document
+        .getElementById("sh-tags")
+        .value.split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      const body = {
+        date: document.getElementById("sh-date").value,
+        day_type: document.getElementById("sh-type").value,
+        start: document.getElementById("sh-start").value || null,
+        end: document.getElementById("sh-end").value || null,
+        tags,
+        segments: tags.length
+          ? [
+              {
+                start: document.getElementById("sh-start").value || null,
+                end: document.getElementById("sh-end").value || null,
+                code: tags[0],
+              },
+            ]
+          : [],
+      };
+      if (!body.date) throw new Error("Date wajib");
+      const res = await api("/dashboard/api/shifts", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      setMsg("shift-msg", `Upserted ${res.date}`, true);
+      await loadShiftsTable();
+    } catch (e) {
+      setMsg("shift-msg", e.message, false);
+    }
+  });
+
+  async function loadShiftsJson() {
+    const data = await api("/dashboard/api/shifts/json");
+    document.getElementById("shifts-json-editor").value = JSON.stringify(data.data, null, 2);
+    setMsg("sj-msg", `Loaded ${data.path}`, true);
+  }
+  document.getElementById("btn-sj-reload").addEventListener("click", () =>
+    loadShiftsJson().catch(showErr)
+  );
+  document.getElementById("btn-sj-save").addEventListener("click", async () => {
+    try {
+      const parsed = JSON.parse(document.getElementById("shifts-json-editor").value);
+      const res = await api("/dashboard/api/shifts/json", {
+        method: "PUT",
+        body: JSON.stringify({ data: parsed, import_to_db: true }),
+      });
+      setMsg("sj-msg", `Saved ${res.path}\nImported: ${res.imported}`, true);
+    } catch (e) {
+      setMsg("sj-msg", e.message, false);
+    }
+  });
+
+  async function loadSchool() {
+    const data = await api("/dashboard/api/school");
+    const el = document.getElementById("school-content");
+    const abts = data.abteilungen || [];
+    if (!abts.length) {
+      el.innerHTML = `<p class="hint">${esc(data.hint)}</p><p class="hint">Tidak ada Abteilung Schule di katalog.</p>`;
+      return;
+    }
+    el.innerHTML =
+      `<p class="hint">${esc(data.hint)}</p>` +
+      abts
+        .map((a) => {
+          const codes = (a.codes || [])
+            .map((c) => {
+              const templates = (c.templates_de || []).map((t) => `<li>${esc(t)}</li>`).join("");
+              const defaults = (c.default_activities_de || [])
+                .map((t) => `<li>${esc(t)}</li>`)
+                .join("");
+              const conds = (c.conditions || [])
+                .map((cond) => {
+                  const when = cond.when || {};
+                  const guests = (when.guest_situation || []).join(", ");
+                  const tags = (when.tags || []).join(", ");
+                  const extra = [guests && `guest_situation=${guests}`, tags && `tags=${tags}`]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return `<li><code>${esc(cond.id || "")}</code> — ${esc(cond.label_de || "")}
+                    <div class="meta">day_type=${esc(when.day_type || "any")} · weekday=${esc(when.weekday || "any")} · time_band=${esc(when.time_band || "any")}${extra ? ` · ${esc(extra)}` : ""}</div>
+                  </li>`;
+                })
+                .join("");
+              return `<div class="card" style="margin-top:0.75rem">
+                <strong>${esc(c.code)} — ${esc(c.name_de || "")}</strong>
+                <div class="meta">Lernfeld: ${esc(c.lernfeld || "-")}</div>
+                <p class="hint">Default</p><ul class="cmd-list">${defaults || "<li>—</li>"}</ul>
+                <p class="hint">Templates DE</p><ul class="cmd-list">${templates || "<li>—</li>"}</ul>
+                <p class="hint">Conditions (edit di katalog JSON)</p><ul class="cmd-list">${conds || "<li>—</li>"}</ul>
+              </div>`;
+            })
+            .join("");
+          return `<h2 style="margin-top:0">${esc(a.blok_name || "Schule")}</h2>
+            <p class="hint">${esc(a.description_de || "")}</p>${codes}`;
+        })
+        .join("");
+  }
+
+  async function loadBlok() {
+    const data = await api("/dashboard/api/blok");
+    const banner = document.getElementById("blok-banner");
+    const blocked = !data.iframe_allowed;
+    banner.className = "banner " + (blocked ? "warn" : "ok");
+    banner.innerHTML = `
+      <strong>${esc(data.ui_label || data.mode)}</strong>
+      <span>${esc(data.note || "")}</span>
+      ${
+        data.iframe_blocked_reason
+          ? `<span class="meta">CSP: ${esc(data.iframe_blocked_reason)}</span>`
+          : ""
+      }`;
+
+    const openBtn = document.getElementById("blok-open-btn");
+    openBtn.href = data.login_url || data.blok_url || openBtn.href;
+    document.getElementById("blok-cta-hint").textContent = blocked
+      ? "iframe diblokir — snapshot live atau buka BLok di tab baru."
+      : "Embed iframe aktif; tombol cadangan tetap tersedia.";
+
+    const creds = data.credentials || {};
+    const snap = data.live_snapshot || {};
+    const snapBtn = document.getElementById("blok-snapshot-btn");
+    snapBtn.disabled = false;
+    snapBtn.title = creds.credential_resolvable
+      ? "Login BLok via Playwright lalu simpan screenshot"
+      : "Butuh BLOK_USERNAME + BLOK_PASSWORD di .env atau Keychain";
+
+    const liveStatus = document.getElementById("blok-live-status");
+    const liveTitle = document.getElementById("blok-live-status-title");
+    const liveDetail = document.getElementById("blok-live-status-detail");
+    if (snap.available || snap.status) {
+      liveStatus.classList.remove("hidden");
+      const logged = Boolean(snap.logged_in);
+      liveStatus.className = "banner " + (logged ? "ok" : "warn");
+      liveTitle.textContent = logged
+        ? "Status: logged in"
+        : `Status: ${snap.status || "failed"}`;
+      const bits = [];
+      if (snap.taken_at) bits.push(`taken ${snap.taken_at}`);
+      if (snap.error) bits.push(snap.error);
+      liveDetail.textContent = bits.join(" · ") || (logged ? "Screenshot siap." : "Belum login.");
+    } else {
+      liveStatus.classList.add("hidden");
+    }
+
+    const liveImg = document.getElementById("blok-live-latest");
+    const liveEmpty = document.getElementById("blok-live-empty");
+    if (snap.image_url) {
+      liveImg.classList.remove("hidden");
+      liveImg.src = snap.image_url + (snap.taken_at ? `?t=${encodeURIComponent(snap.taken_at)}` : `?t=${Date.now()}`);
+      liveEmpty.classList.add("hidden");
+    } else {
+      liveImg.classList.add("hidden");
+      liveImg.removeAttribute("src");
+      liveEmpty.classList.remove("hidden");
+      liveEmpty.textContent = creds.credential_resolvable
+        ? "Belum ada snapshot. Klik Ambil snapshot live."
+        : "Belum ada snapshot. Set BLOK_USERNAME + BLOK_PASSWORD di .env (cloud) atau Keychain di Mac.";
+    }
+
+    const cells = [
+      ["Embed mode", data.embed_mode || "—", data.embed_mode === "iframe" || data.embed_mode === "screenshot"],
+      ["Iframe allowed", data.iframe_allowed, data.iframe_allowed],
+      ["Live creds", creds.credential_resolvable, creds.credential_resolvable],
+      ["Creds source", creds.source || "none", creds.source && creds.source !== "none"],
+      ["Snapshot", snap.logged_in ? "logged in" : snap.status || "none", Boolean(snap.logged_in)],
+      ["Keychain", Boolean(data.keychain_available), Boolean(data.keychain_available)],
+    ];
+    document.getElementById("blok-status-grid").innerHTML = cells
+      .map(([label, val, ok]) => {
+        const display =
+          typeof val === "boolean" ? (val ? "yes" : "no") : String(val ?? "—");
+        return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${ok ? "ok" : "bad"}">${esc(display)}</div></div>`;
+      })
+      .join("");
+
+    document.getElementById("blok-meta").innerHTML = `
+      Mode: <strong>${esc(data.mode)}</strong> ·
+      <a href="${esc(data.login_url || data.blok_url)}" target="_blank" rel="noopener" style="color:var(--accent)">blok/login</a><br/>
+      Docs: ${(data.docs || []).map((d) => `<code>${esc(d)}</code>`).join(" ")}<br/>
+      ${data.proxy && data.proxy.reason ? esc(data.proxy.reason) : ""}`;
+
+    const list = document.getElementById("blok-files");
+    list.innerHTML = (data.files || [])
+      .map(
+        (f) =>
+          `<button type="button" data-url="${esc(f.preview_url)}" data-kind="${esc(f.kind)}">${esc(f.name)}</button>`
+      )
+      .join("") || '<span class="hint">Belum ada file di output/blok_dry_run/</span>';
+
+    const shots = document.getElementById("blok-shots");
+    shots.innerHTML = (data.live_screenshots || [])
+      .map(
+        (f) =>
+          `<button type="button" data-url="${esc(f.preview_url)}" data-kind="image">${esc(f.name)}</button>`
+      )
+      .join("") ||
+      '<span class="hint">Worker --live screenshots (*_live.png) muncul di sini jika pernah dijalankan.</span>';
+
+    const iframe = document.getElementById("blok-iframe");
+    const pre = document.getElementById("blok-json");
+    const shotImg = document.getElementById("blok-shot-img");
+
+    function showPreview(url, kind) {
+      if (kind === "html") {
+        iframe.classList.remove("hidden");
+        pre.classList.add("hidden");
+        shotImg.classList.add("hidden");
+        iframe.src = url;
+      } else if (kind === "image") {
+        iframe.classList.add("hidden");
+        pre.classList.add("hidden");
+        shotImg.classList.remove("hidden");
+        shotImg.src = url;
+      } else {
+        iframe.classList.add("hidden");
+        shotImg.classList.add("hidden");
+        pre.classList.remove("hidden");
+        fetch(url, { headers: headers() })
+          .then((r) => r.text())
+          .then((t) => {
+            pre.textContent = t;
+          });
+      }
+    }
+
+    [...list.querySelectorAll("button[data-url]"), ...shots.querySelectorAll("button[data-url]")].forEach(
+      (btn) => {
+        btn.addEventListener("click", () => showPreview(btn.dataset.url, btn.dataset.kind));
+      }
+    );
+
+    const firstHtml = (data.files || []).find((f) => f.kind === "html");
+    if (firstHtml && !snap.image_url) showPreview(firstHtml.preview_url, "html");
+  }
+
+  document.getElementById("blok-snapshot-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("blok-snapshot-btn");
+    const liveStatus = document.getElementById("blok-live-status");
+    const liveTitle = document.getElementById("blok-live-status-title");
+    const liveDetail = document.getElementById("blok-live-status-detail");
+    btn.disabled = true;
+    liveStatus.classList.remove("hidden");
+    liveStatus.className = "banner warn";
+    liveTitle.textContent = "Mengambil snapshot…";
+    liveDetail.textContent = "Playwright login ke BLok (bisa 15–60 detik).";
+    try {
+      const data = await api("/dashboard/api/blok/live-snapshot", { method: "POST" });
+      liveStatus.className = "banner " + (data.logged_in ? "ok" : "warn");
+      liveTitle.textContent = data.logged_in
+        ? "Status: logged in"
+        : `Status: ${data.status || "failed"}`;
+      liveDetail.textContent = data.error || data.final_url || "Selesai.";
+      const liveImg = document.getElementById("blok-live-latest");
+      const liveEmpty = document.getElementById("blok-live-empty");
+      if (data.image_url) {
+        liveImg.classList.remove("hidden");
+        liveImg.src = data.image_url + `?t=${Date.now()}`;
+        liveEmpty.classList.add("hidden");
+      }
+      await loadBlok();
+    } catch (e) {
+      liveStatus.className = "banner warn";
+      liveTitle.textContent = "Status: failed";
+      liveDetail.textContent = e.message || String(e);
+      showErr(e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  async function loadSync() {
+    const data = await api("/dashboard/api/sync");
+    statusPill.textContent = data.token_configured ? "sync ready" : "token missing";
+    statusPill.className = data.token_configured ? "pill ok" : "pill warn";
+    document.getElementById("sync-remote-url").value = data.remote_api_url || "";
+
+    const lc = data.local_counts || {};
+    const cells = [
+      ["Token", data.token_configured, data.token_configured],
+      ["Remote URL", Boolean(data.remote_api_url), Boolean(data.remote_api_url)],
+      ["Shifts", lc.shifts > 0, true],
+      ["Work logs", lc.work_logs > 0, true],
+      ["Drafts", lc.drafts > 0, true],
+      ["Approvals", (lc.approvals || 0) >= 0, true],
+    ];
+    const grid = document.getElementById("sync-status-grid");
+    grid.innerHTML =
+      cells
+        .map(([label, present, ok]) => {
+          const cls = ok ? "ok" : "bad";
+          let val = present ? "yes" : "no";
+          if (label === "Shifts") val = String(lc.shifts ?? 0);
+          if (label === "Work logs") val = String(lc.work_logs ?? 0);
+          if (label === "Drafts") val = String(lc.drafts ?? 0);
+          if (label === "Approvals") val = String(lc.approvals ?? 0);
+          return `<div class="stat"><div class="label">${esc(label)}</div><div class="value ${cls}">${esc(val)}</div></div>`;
+        })
+        .join("") +
+      `<div class="stat"><div class="label">Last pull</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_pull_at || "—")}</div></div>` +
+      `<div class="stat"><div class="label">Last push</div><div class="value" style="font-size:0.8rem;font-weight:400">${esc(data.last_push_at || "—")}</div></div>` +
+      (data.last_error
+        ? `<div class="stat"><div class="label">Last error</div><div class="value bad" style="font-size:0.75rem;font-weight:400">${esc(data.last_error)}</div></div>`
+        : "");
+  }
+
+  document.getElementById("btn-sync-save").addEventListener("click", async () => {
+    try {
+      const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+      const res = await api("/dashboard/api/sync/config", {
+        method: "PUT",
+        body: JSON.stringify({ remote_api_url }),
+      });
+      setMsg("sync-msg", `Saved remote: ${res.remote_api_url || "(cleared)"}`, true);
+      await loadSync();
+    } catch (e) {
+      setMsg("sync-msg", e.message, false);
+    }
+  });
+
+  async function runSync(direction) {
+    try {
+      const remote_api_url = document.getElementById("sync-remote-url").value.trim();
+      setMsg("sync-msg", `${direction}…`, true);
+      const res = await api("/dashboard/api/sync/run", {
+        method: "POST",
+        body: JSON.stringify({ direction, remote_api_url, mode: "merge" }),
+      });
+      setMsg("sync-msg", JSON.stringify(res.result || res, null, 2), true);
+      await loadSync();
+    } catch (e) {
+      setMsg("sync-msg", e.message, false);
+    }
+  }
+
+  document.getElementById("btn-sync-pull").addEventListener("click", () => runSync("pull"));
+  document.getElementById("btn-sync-push").addEventListener("click", () => runSync("push"));
+
+  async function loadBots() {
+    const data = await api("/dashboard/api/bots");
+    const tg = data.telegram || {};
+    const wa = data.whatsapp || {};
+    document.getElementById("bot-telegram").innerHTML = `
+      <h2 style="margin:0 0 0.5rem">Telegram</h2>
+      <div class="meta">Token: ${tg.token_present ? "present" : "missing"} · Chat ID file: ${tg.chat_id_saved ? esc(tg.chat_id) : "—"}</div>
+      <p class="hint">${esc(tg.open_hint)}</p>
+      <p class="hint">Docs: <code>${esc(tg.docs)}</code></p>
+      <p class="hint">Menu buttons</p>
+      <ul class="cmd-list">${(tg.menu_buttons || []).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      <p class="hint">Commands</p>
+      <ul class="cmd-list">${(tg.commands || []).map((c) => `<li>/${esc(c.command)} — ${esc(c.description)}</li>`).join("")}</ul>`;
+
+    const waha = wa.waha || {};
+    document.getElementById("bot-whatsapp").innerHTML = `
+      <h2 style="margin:0 0 0.5rem">WhatsApp (WAHA)</h2>
+      <div class="meta">Allowlist: ${wa.allowlist_set ? "set" : "empty"} · Chat ID: ${wa.chat_id_saved ? esc(wa.chat_id) : "—"}</div>
+      <div class="meta">WAHA: ${waha.ok ? "reachable" : esc(waha.error || "unreachable")}</div>
+      <p class="hint">${esc(wa.open_hint)}</p>
+      <p class="hint">Docs: <code>${esc(wa.docs)}</code></p>`;
+  }
+
+  const HARI_MONTHS = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+  ];
+  let hariActiveDate = "";
+  const hariComposer = new Map();
+
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function isoFromDate(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function parseIso(iso) {
+    const [year, month, day] = iso.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  function shiftIso(iso, days) {
+    const d = parseIso(iso);
+    d.setDate(d.getDate() + days);
+    return isoFromDate(d);
+  }
+
+  function clampIso(year, month, day) {
+    const last = new Date(year, month, 0).getDate();
+    const clamped = Math.min(Math.max(day, 1), last);
+    return `${year}-${pad2(month)}-${pad2(clamped)}`;
+  }
+
+  function clockLabel(start, end) {
+    if (!start || !end) return null;
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
+    let mins = eh * 60 + em - (sh * 60 + sm);
+    if (mins < 0) mins += 24 * 60;
+    return `${Math.floor(mins / 60)}h:${pad2(mins % 60)}min`;
+  }
+
+  function withToken(url) {
+    if (!url) return "";
+    const u = new URL(url, window.location.origin);
+    const token = tokenInput.value.trim();
+    if (token) u.searchParams.set("token", token);
+    u.searchParams.set("t", String(Date.now()));
+    return `${u.pathname}${u.search}`;
+  }
+
+  function rememberComposer() {
+    if (!hariActiveDate) return;
+    hariComposer.set(hariActiveDate, document.getElementById("hari-composer").value);
+  }
+
+  function paintDuration() {
+    const start = document.getElementById("hari-start").value;
+    const end = document.getElementById("hari-end").value;
+    const clock = clockLabel(start, end);
+    const blok = document.getElementById("hari-duration").dataset.blok || "";
+    const clockText = clock || "—";
+    let text = `Durasi ${clockText}`;
+    if (blok && blok !== clock) text += ` · BLok ${blok}`;
+    document.getElementById("hari-duration").textContent = text;
+  }
+
+  function syncHariParts(iso) {
+    const d = parseIso(iso);
+    document.getElementById("hari-month").value = String(d.getMonth() + 1);
+    const yearSel = document.getElementById("hari-year");
+    const year = String(d.getFullYear());
+    if (![...yearSel.options].some((opt) => opt.value === year)) {
+      const extra = document.createElement("option");
+      extra.value = year;
+      extra.textContent = year;
+      yearSel.appendChild(extra);
+    }
+    yearSel.value = year;
+  }
+
+  function initHariControls() {
+    const month = document.getElementById("hari-month");
+    HARI_MONTHS.forEach((name, index) => {
+      const opt = document.createElement("option");
+      opt.value = String(index + 1);
+      opt.textContent = name;
+      month.appendChild(opt);
+    });
+    const yearSel = document.getElementById("hari-year");
+    const today = new Date();
+    for (let year = today.getFullYear() - 2; year <= today.getFullYear() + 2; year += 1) {
+      const opt = document.createElement("option");
+      opt.value = String(year);
+      opt.textContent = String(year);
+      yearSel.appendChild(opt);
+    }
+    const iso = isoFromDate(today);
+    document.getElementById("hari-date").value = iso;
+    syncHariParts(iso);
+  }
+
+  function renderPhrases(groups) {
+    const root = document.getElementById("hari-phrases");
+    root.replaceChildren();
+    if (!groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Tidak ada frasa katalog untuk tanggal ini.";
+      root.appendChild(empty);
+      return;
+    }
+    const anyToday = groups.some((group) => group.for_day);
+    groups.forEach((group, index) => {
+      const block = document.createElement("details");
+      block.className = group.for_day ? "phrase-group is-today" : "phrase-group";
+      block.open = group.for_day || (!anyToday && index === 0);
+      const title = document.createElement("summary");
+      title.className = "phrase-group-title";
+      const sym = document.createElement("span");
+      sym.className = "sym";
+      sym.setAttribute("aria-hidden", "true");
+      sym.textContent = group.symbol || "✦";
+      const name = document.createElement("span");
+      name.className = "phrase-name";
+      name.textContent = `${group.code}${group.name_de ? " — " + group.name_de : ""}`;
+      title.append(sym, name);
+      if (group.for_day) {
+        const mark = document.createElement("span");
+        mark.className = "phrase-today";
+        mark.textContent = "hari ini";
+        title.append(mark);
+      }
+      const row = document.createElement("div");
+      row.className = "phrase-row";
+      (group.buttons || []).forEach((button) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "phrase-btn";
+        el.title = button.text || "";
+        const chip = document.createElement("span");
+        chip.className = "sym";
+        chip.setAttribute("aria-hidden", "true");
+        chip.textContent = group.symbol || "✦";
+        const label = document.createElement("span");
+        label.textContent = button.label || button.kind || "Frasa";
+        el.append(chip, label);
+        el.addEventListener("click", () => {
+          const box = document.getElementById("hari-composer");
+          const text = (button.text || "").trim();
+          if (!text) return;
+          const current = box.value;
+          if (!current.trim()) box.value = text;
+          else if (current.endsWith("\n")) box.value = current + text;
+          else box.value = `${current}\n${text}`;
+          if (hariActiveDate) hariComposer.set(hariActiveDate, box.value);
+          box.focus();
+        });
+        row.appendChild(el);
+      });
+      block.append(title, row);
+      root.appendChild(block);
+    });
+  }
+
+  function renderThumbs(attachments) {
+    const root = document.getElementById("hari-thumbs");
+    root.replaceChildren();
+    const photos = (attachments || []).filter((item) => item.media_url || item.blok_status);
+    if (!photos.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint hari-photo-empty";
+      empty.textContent = "Belum ada foto.";
+      root.appendChild(empty);
+      return;
+    }
+    photos.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "hari-thumb";
+      if (item.media_url) {
+        const img = document.createElement("img");
+        img.alt = item.caption || `Foto ${item.id}`;
+        img.src = withToken(item.media_url);
+        card.appendChild(img);
+      }
+      const cap = document.createElement("span");
+      cap.textContent = item.blok_status || "lokal";
+      card.appendChild(cap);
+      root.appendChild(card);
+    });
+  }
+
+  function renderPreview(data) {
+    const preview = data.preview || {};
+    const draftEl = document.getElementById("hari-draft-text");
+    const empty = document.getElementById("hari-preview-empty");
+    const frame = document.getElementById("hari-preview-frame");
+    const shot = document.getElementById("hari-preview-shot");
+    if (preview.draft_text) {
+      const head = [
+        preview.ort ? `Ort: ${preview.ort}` : "",
+        preview.hours ? `Zeit: ${preview.hours}` : "",
+        preview.draft_status ? `Status: ${preview.draft_status}` : "",
+      ].filter(Boolean);
+      draftEl.textContent = head.length
+        ? `${head.join("\n")}\n\n${preview.draft_text}`
+        : preview.draft_text;
+    } else {
+      draftEl.textContent = "Belum ada draft Jerman untuk tanggal ini.";
+    }
+    if (preview.html_url) {
+      frame.classList.remove("hidden");
+      empty.classList.add("hidden");
+      frame.src = withToken(preview.html_url);
+    } else {
+      frame.classList.add("hidden");
+      frame.removeAttribute("src");
+      empty.classList.remove("hidden");
+      empty.textContent = "Belum ada preview untuk tanggal ini. Simpan log, lalu Buat draft atau Isi BLok (dry-run).";
+    }
+    if (preview.screenshot_url) {
+      shot.classList.remove("hidden");
+      shot.src = withToken(preview.screenshot_url);
+      empty.classList.add("hidden");
+    } else {
+      shot.classList.add("hidden");
+      shot.removeAttribute("src");
+    }
+  }
+
+  function renderHari(data) {
+    hariActiveDate = data.date;
+    document.getElementById("hari-date").value = data.date;
+    syncHariParts(data.date);
+    document.getElementById("hari-weekday").textContent =
+      `${data.weekday_id || ""} · ${data.weekday_de || ""}`.trim();
+    const hours = data.hours || {};
+    document.getElementById("hari-start").value = (hours.start_time || "").slice(0, 5);
+    document.getElementById("hari-end").value = (hours.end_time || "").slice(0, 5);
+    document.getElementById("hari-type").value = hours.day_type || "arbeit";
+    document.getElementById("hari-duration").dataset.blok = hours.blok_label || "";
+    paintDuration();
+
+    const creds = Boolean(data.blok && data.blok.credentials_present);
+    const banner = document.getElementById("hari-banner");
+    banner.className = `banner ${creds ? "ok" : "warn"}`;
+    document.getElementById("hari-banner-title").textContent = creds
+      ? "Kredensial BLok ada"
+      : "Kredensial BLok belum ada";
+    document.getElementById("hari-banner-detail").textContent = creds
+      ? "Isi BLok live bisa mengirim. Dry-run tetap tersedia."
+      : "Isi hari tetap tersimpan + dry-run. Live menunggu BLOK_USERNAME/PASSWORD atau Keychain.";
+
+    const logs = data.work_logs || [];
+    const logRoot = document.getElementById("hari-logs");
+    logRoot.innerHTML = logs.length
+      ? logs
+          .map(
+            (row) =>
+              `<div class="feed-item"><div class="meta">${esc(row.created_at || "")} · ${esc(row.source || "")}</div>${esc(row.content)}</div>`
+          )
+          .join("")
+      : `<div class="feed-item"><span class="hint">Belum ada catatan untuk hari ini.</span></div>`;
+
+    renderPhrases(data.phrases || []);
+    document.getElementById("hari-composer").value = hariComposer.get(data.date) || "";
+    renderThumbs(data.attachments || []);
+    renderPreview(data);
+
+    const liveBtn = document.getElementById("hari-live");
+    liveBtn.disabled = !creds;
+    liveBtn.title = creds
+      ? "Kirim hari ini ke BLok"
+      : "Live nonaktif sampai kredensial BLok ada. Dry-run tetap menyimpan draft.";
+    statusPill.textContent = creds ? "BLok live siap" : "dry-run";
+    statusPill.className = creds ? "pill ok" : "pill warn";
+  }
+
+  function showHariStatus(data) {
+    const label = data.status_label || "";
+    if (!label) return;
+    const banner = document.getElementById("hari-banner");
+    const live = label === "live terkirim";
+    banner.className = `banner ${live ? "ok" : "warn"}`;
+    document.getElementById("hari-banner-title").textContent = label;
+    let detail = data.message || "";
+    if (data.live_error) {
+      detail = `Live gagal: ${data.live_error}. ${label}`;
+    } else if (data.fallback_dry_run) {
+      detail = "Kredensial live tidak dipakai. Preview dry-run lokal.";
+    } else if (label === "tersimpan + dry-run") {
+      detail = "Draft lokal dan HTML preview siap di panel kanan.";
+    } else if (label === "live terkirim") {
+      detail = "Hari ini terkirim lewat worker BLok.";
+    } else if (label === "upload pending") {
+      detail = data.message || "Foto tersimpan lokal. Upload BLok menunggu kredensial.";
+    } else if (label === "tersimpan") {
+      detail = "Draft lokal tersimpan. Dry-run belum dijalankan.";
+    }
+    document.getElementById("hari-banner-detail").textContent = detail || label;
+    setMsg("hari-msg", detail && detail !== label ? `${label} — ${detail}` : label, live || !data.live_error);
+  }
+
+  async function loadHari(iso) {
+    const date = iso || hariActiveDate || document.getElementById("hari-date").value || isoFromDate(new Date());
+    hariActiveDate = date;
+    document.getElementById("hari-date").value = date;
+    const data = await api(`/dashboard/api/day?date=${encodeURIComponent(date)}`);
+    renderHari(data);
+    return data;
+  }
+
+  async function gotoHari(iso) {
+    rememberComposer();
+    hariActiveDate = iso;
+    document.getElementById("hari-date").value = iso;
+    syncHariParts(iso);
+    return loadHari(iso);
+  }
+
+  function jumpHariMonth() {
+    const iso = hariActiveDate || document.getElementById("hari-date").value || isoFromDate(new Date());
+    const day = Number(iso.slice(8, 10)) || 1;
+    const year = Number(document.getElementById("hari-year").value);
+    const month = Number(document.getElementById("hari-month").value);
+    return gotoHari(clampIso(year, month, day));
+  }
+
+  async function postHari(path, body) {
+    const data = await api(path, { method: "POST", body: JSON.stringify(body) });
+    if (data.day) renderHari(data.day);
+    else await loadHari(body.date || hariActiveDate);
+    showHariStatus(data);
+    return data;
+  }
+
+  initHariControls();
+  document.getElementById("hari-prev").addEventListener("click", () => {
+    const iso = hariActiveDate || document.getElementById("hari-date").value;
+    gotoHari(shiftIso(iso, -1)).catch(showErr);
+  });
+  document.getElementById("hari-next").addEventListener("click", () => {
+    const iso = hariActiveDate || document.getElementById("hari-date").value;
+    gotoHari(shiftIso(iso, 1)).catch(showErr);
+  });
+  document.getElementById("hari-date").addEventListener("change", () => {
+    const next = document.getElementById("hari-date").value;
+    if (!next) return;
+    rememberComposer();
+    hariActiveDate = next;
+    syncHariParts(next);
+    loadHari(next).catch(showErr);
+  });
+  document.getElementById("hari-month").addEventListener("change", () => {
+    jumpHariMonth().catch(showErr);
+  });
+  document.getElementById("hari-year").addEventListener("change", () => {
+    jumpHariMonth().catch(showErr);
+  });
+  document.getElementById("hari-start").addEventListener("input", paintDuration);
+  document.getElementById("hari-end").addEventListener("input", paintDuration);
+  document.getElementById("hari-composer").addEventListener("input", () => {
+    if (hariActiveDate) {
+      hariComposer.set(hariActiveDate, document.getElementById("hari-composer").value);
+    }
+  });
+  document.getElementById("hari-save-hours").addEventListener("click", async () => {
+    try {
+      const start = document.getElementById("hari-start").value;
+      const end = document.getElementById("hari-end").value;
+      if (!start || !end) {
+        setMsg("hari-msg", "Isi jam mulai dan selesai.", false);
+        return;
+      }
+      await api("/dashboard/api/day/hours", {
+        method: "PUT",
+        body: JSON.stringify({
+          date: hariActiveDate,
+          start_time: start,
+          end_time: end,
+          day_type: document.getElementById("hari-type").value,
+        }),
+      });
+      await loadHari(hariActiveDate);
+      setMsg("hari-msg", "Jam tersimpan.", true);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-save-log").addEventListener("click", async () => {
+    try {
+      const text = document.getElementById("hari-composer").value.trim();
+      if (!text) {
+        setMsg("hari-msg", "Tulis catatan atau klik frasa dulu.", false);
+        return;
+      }
+      await api("/dashboard/api/day/log", {
+        method: "POST",
+        body: JSON.stringify({ date: hariActiveDate, text }),
+      });
+      hariComposer.set(hariActiveDate, "");
+      await loadHari(hariActiveDate);
+      setMsg("hari-msg", "Log tersimpan.", true);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-draft").addEventListener("click", async () => {
+    try {
+      await postHari("/dashboard/api/day/draft", {
+        date: hariActiveDate,
+        start_time: document.getElementById("hari-start").value || null,
+        end_time: document.getElementById("hari-end").value || null,
+        day_type: document.getElementById("hari-type").value,
+      });
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-dry").addEventListener("click", async () => {
+    try {
+      await postHari("/dashboard/api/day/fill", {
+        date: hariActiveDate,
+        mode: "dry_run",
+        start_time: document.getElementById("hari-start").value || null,
+        end_time: document.getElementById("hari-end").value || null,
+        day_type: document.getElementById("hari-type").value,
+      });
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-live").addEventListener("click", async () => {
+    try {
+      await postHari("/dashboard/api/day/fill", {
+        date: hariActiveDate,
+        mode: "live",
+        start_time: document.getElementById("hari-start").value || null,
+        end_time: document.getElementById("hari-end").value || null,
+        day_type: document.getElementById("hari-type").value,
+      });
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-photo").addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Gagal baca foto"));
+        reader.readAsDataURL(file);
+      });
+      const saved = await api("/dashboard/api/day/photo", {
+        method: "POST",
+        body: JSON.stringify({
+          date: hariActiveDate,
+          filename: file.name,
+          mime_type: file.type || "image/jpeg",
+          image_base64: dataUrl,
+        }),
+      });
+      await loadHari(hariActiveDate);
+      showHariStatus(saved);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+  document.getElementById("hari-upload-blok").addEventListener("click", async () => {
+    try {
+      const data = await api("/dashboard/api/day/photo/upload-blok", {
+        method: "POST",
+        body: JSON.stringify({ date: hariActiveDate }),
+      });
+      await loadHari(hariActiveDate);
+      showHariStatus(data);
+    } catch (e) {
+      setMsg("hari-msg", e.message, false);
+      showErr(e);
+    }
+  });
+
+  function setMsg(id, text, ok) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = "msg " + (ok ? "ok" : "err");
+  }
+
+  function showErr(e) {
+    statusPill.textContent = e.message || String(e);
+    statusPill.className = "pill warn";
+  }
+
+  showPanel("overview");
+  setInterval(() => {
+    const active = document.querySelector("#nav button.active");
+    if (active && (active.dataset.panel === "live" || active.dataset.panel === "overview")) {
+      loadPanel(active.dataset.panel).catch(() => {});
+    }
+  }, 15000);
+})();
