@@ -524,7 +524,7 @@ def dashboard_school(_: None = Depends(require_dashboard_access)):
         "templates_schule": templates,
         "katalog_path": _rel(catalog.KATALOG_PATH),
         "templates_path": _rel(templates_path),
-        "hint": "Edit materi sekolah lewat panel Katalog (Abteilung Schule) lalu Save + Sync DB.",
+        "hint": "Edit materi sekolah lewat panel Katalog (Abteilung Schule) lalu Save + Sync DB. Conditions diedit di data/katalog_abteilung.json.",
     }
 
 

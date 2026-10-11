@@ -69,7 +69,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
             code TEXT PRIMARY KEY,
             name_de TEXT,
             keywords_json TEXT,
-            default_activities_json TEXT
+            default_activities_json TEXT,
+            conditions_json TEXT
         );
 
         CREATE TABLE IF NOT EXISTS attachments (
@@ -101,6 +102,10 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     ):
         if col not in cols:
             conn.execute(f"ALTER TABLE attachments ADD COLUMN {col} {typ}")
+
+    area_cols = {row[1] for row in conn.execute("PRAGMA table_info(work_areas)")}
+    if "conditions_json" not in area_cols:
+        conn.execute("ALTER TABLE work_areas ADD COLUMN conditions_json TEXT")
 
 
 def upsert_template(
@@ -290,21 +295,26 @@ def upsert_area(
     name_de: str,
     keywords: list[str],
     default_activities: list[str],
+    conditions: list[dict[str, Any]] | None = None,
 ) -> None:
     conn.execute(
         """
-        INSERT INTO work_areas (code, name_de, keywords_json, default_activities_json)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO work_areas (
+            code, name_de, keywords_json, default_activities_json, conditions_json
+        )
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(code) DO UPDATE SET
             name_de=excluded.name_de,
             keywords_json=excluded.keywords_json,
-            default_activities_json=excluded.default_activities_json
+            default_activities_json=excluded.default_activities_json,
+            conditions_json=excluded.conditions_json
         """,
         (
             code,
             name_de,
             json.dumps(keywords, ensure_ascii=False),
             json.dumps(default_activities, ensure_ascii=False),
+            json.dumps(conditions or [], ensure_ascii=False),
         ),
     )
     conn.commit()

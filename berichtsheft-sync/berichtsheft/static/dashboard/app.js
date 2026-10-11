@@ -304,11 +304,25 @@
               const defaults = (c.default_activities_de || [])
                 .map((t) => `<li>${esc(t)}</li>`)
                 .join("");
+              const conds = (c.conditions || [])
+                .map((cond) => {
+                  const when = cond.when || {};
+                  const guests = (when.guest_situation || []).join(", ");
+                  const tags = (when.tags || []).join(", ");
+                  const extra = [guests && `guest_situation=${guests}`, tags && `tags=${tags}`]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return `<li><code>${esc(cond.id || "")}</code> — ${esc(cond.label_de || "")}
+                    <div class="meta">day_type=${esc(when.day_type || "any")} · weekday=${esc(when.weekday || "any")} · time_band=${esc(when.time_band || "any")}${extra ? ` · ${esc(extra)}` : ""}</div>
+                  </li>`;
+                })
+                .join("");
               return `<div class="card" style="margin-top:0.75rem">
                 <strong>${esc(c.code)} — ${esc(c.name_de || "")}</strong>
                 <div class="meta">Lernfeld: ${esc(c.lernfeld || "-")}</div>
                 <p class="hint">Default</p><ul class="cmd-list">${defaults || "<li>—</li>"}</ul>
                 <p class="hint">Templates DE</p><ul class="cmd-list">${templates || "<li>—</li>"}</ul>
+                <p class="hint">Conditions (edit di katalog JSON)</p><ul class="cmd-list">${conds || "<li>—</li>"}</ul>
               </div>`;
             })
             .join("");

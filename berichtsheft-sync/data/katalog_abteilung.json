@@ -1,6 +1,25 @@
 {
-  "version": 1,
-  "note": "Sumber kebenaran kegiatan per Abteilung. Edit di sini → jalankan: python3 -m berichtsheft catalog --reload",
+  "version": 2,
+  "note": "Sumber kebenaran kegiatan per Abteilung, termasuk conditions per code. templates_de tetap pool default. Edit conditions di file ini (id, label_de, when, texts_de) → jalankan: python3 -m berichtsheft catalog --reload --write-md",
+  "condition_schema": {
+    "edit_in": "data/katalog_abteilung.json",
+    "per": "setiap code, array conditions",
+    "id": "slug, contoh check-in-rush",
+    "label_de": "nama kondisi yang tampil saat diedit",
+    "when": {
+      "day_type": "arbeit | schule | frei | null (= any)",
+      "weekday": "mo | di | mi | do | fr | sa | so | null (= any)",
+      "time_band": "frueh | spaet | nacht | any | null (= any)",
+      "guest_situation": [
+        "tag situasi tamu"
+      ],
+      "tags": [
+        "tag tugas"
+      ]
+    },
+    "texts_de": "2–4 kalimat Berichtsheft bahasa Jerman, dipakai jika when cocok",
+    "backward_compatible": "templates_de tidak dihapus dan tetap pool default generator"
+  },
   "abteilungen": [
     {
       "blok_name": "Service",
@@ -27,6 +46,87 @@
             "Mithilfe bei der Vorbereitung und dem Abbau des Frühstücksbuffets sowie Abstimmung mit der Küche.",
             "Gästewünsche am Frühstück entgegennehmen und bei Sonderwünschen die Kolleg:innen informieren.",
             "Kontrolle der Buffetqualität (Frische, Vollständigkeit) und Nachfüllen der Stationen während des Betriebs."
+          ],
+          "conditions": [
+            {
+              "id": "buffet-andrang",
+              "label_de": "Buffetandrang am Morgen",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "buffet",
+                  "andrang"
+                ],
+                "tags": []
+              },
+              "texts_de": [
+                "Während des Frühstücksandrangs Gäste begrüßen, freie Plätze anbieten und das Buffet laufend nachfüllen.",
+                "Getränkestationen für Kaffee, Tee und Saft im Stoßbetrieb kontrollieren und leere Kannen sofort austauschen.",
+                "Die Küche über zur Neige gehende Speisen informieren und die Laufwege am Buffet freihalten."
+              ]
+            },
+            {
+              "id": "buffet-aufbau",
+              "label_de": "Aufbau und Abbau des Buffets",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "aufbau",
+                  "abbau"
+                ],
+                "tags": [
+                  "buffet"
+                ]
+              },
+              "texts_de": [
+                "Das Frühstücksbuffet vor der Öffnung aufbauen und Geschirr, Besteck sowie Speisenstationen nach Hotelstandard platzieren.",
+                "Die Kühlkette und die Frische leicht verderblicher Speisen beim Aufbau prüfen.",
+                "Nach Betriebsschluss das Buffet abbauen, Reste fachgerecht entsorgen und die Stationen für die nächste Schicht reinigen."
+              ]
+            },
+            {
+              "id": "sonderwunsch",
+              "label_de": "Sonderwünsche am Frühstück",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "sonderwunsch",
+                  "allergie"
+                ],
+                "tags": []
+              },
+              "texts_de": [
+                "Sonderwünsche und Hinweise zu Allergien am Frühstück aufnehmen und an die Küche weitergeben.",
+                "Alternative Speisen für Gäste mit Unverträglichkeiten anfordern und die Ausgabe kurz erklären.",
+                "Rückfragen zum Buffetangebot sachlich beantworten und bei Unsicherheit die Serviceleitung hinzuziehen."
+              ]
+            },
+            {
+              "id": "ruhiges-fruehstueck",
+              "label_de": "Ruhiger Frühstücksbetrieb",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "ruhig"
+                ],
+                "tags": [
+                  "fruehstueck"
+                ]
+              },
+              "texts_de": [
+                "Bei geringem Gästeaufkommen Buffetqualität, Tischsauberkeit und Getränkevorrat in Ruhe kontrollieren.",
+                "Freie Tische abräumen, neu eindecken und die Stationen optisch ordnen.",
+                "Mise en Place und Restarbeiten für die folgende Frühstücksschicht vorbereiten."
+              ]
+            }
           ]
         },
         {
@@ -47,6 +147,70 @@
             "Mithilfe im BAF-Bereich: Service und Vorbereitung gemäß Dienstplan.",
             "Unterstützung bei Gästebetreuung und Abläufen im Frühstücks-/Servicebereich BAF.",
             "Abstimmung mit dem Team zu Arbeitsabläufen und Übergabe am Schichtende."
+          ],
+          "conditions": [
+            {
+              "id": "service-vorbereitung",
+              "label_de": "Vorbereitung im Service",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "vorbereitung"
+                ],
+                "tags": [
+                  "mise-en-place",
+                  "service"
+                ]
+              },
+              "texts_de": [
+                "Den Servicebereich BAF vorbereiten und Gedecke, Getränke sowie Arbeitsplätze gemäß Dienstplan herrichten.",
+                "Besteck, Gläser und Servietten kontrollieren und fehlende Teile nachlegen.",
+                "Den Ablauf der Schicht mit dem Team abstimmen, bevor die Gäste eintreffen."
+              ]
+            },
+            {
+              "id": "gaestebetreuung",
+              "label_de": "Gästebetreuung im Service",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "service",
+                  "gast"
+                ],
+                "tags": [
+                  "baf"
+                ]
+              },
+              "texts_de": [
+                "Gäste im BAF-Bereich begrüßen, Bestellungen aufnehmen und Speisen sowie Getränke servieren.",
+                "Während des Service auf Nachbestellungen achten und abgeräumtes Geschirr zeitnah abtragen.",
+                "Bei Fragen zur Speisekarte die Kolleg:innen oder die Küche hinzuziehen."
+              ]
+            },
+            {
+              "id": "schichtuebergabe",
+              "label_de": "Übergabe am Schichtende",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "uebergabe"
+                ],
+                "tags": [
+                  "schichtende"
+                ]
+              },
+              "texts_de": [
+                "Offene Tische, Reservierungen und besondere Gästewünsche für die Folgeschicht notieren.",
+                "Den Arbeitsplatz übergeben, Belege abstimmen und den Bereich aufräumen.",
+                "In der Übergabe Störungen und noch offene Aufgaben mit dem Team durchsprechen."
+              ]
+            }
           ]
         }
       ]
@@ -57,7 +221,9 @@
       "codes": [
         {
           "code": "Rezeption",
-          "aliases": ["Rez"],
+          "aliases": [
+            "Rez"
+          ],
           "name_de": "Rezeption / Empfang",
           "department": "Rezeption",
           "lernfeld": "Gästeservice und Kommunikation / Empfang",
@@ -83,6 +249,181 @@
             "Unterstützung bei leichten Aufgaben des Night Audit: Tagesabschluss kontrollieren und offene Buchungen prüfen.",
             "Schlüsselkarten programmieren, ausgeben und bei Verlust nach den Hausregeln neu erstellen.",
             "Beschwerden ruhig und sachlich aufnehmen, eine Lösung anbieten und die Schichtleitung informieren."
+          ],
+          "conditions": [
+            {
+              "id": "check-in-rush",
+              "label_de": "Check-in Andrang",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "spaet",
+                "guest_situation": [
+                  "check-in",
+                  "andrang"
+                ],
+                "tags": [
+                  "empfang"
+                ]
+              },
+              "texts_de": [
+                "Im Check-in-Andrang Gäste zügig begrüßen, die Reservierung prüfen und den Check-in im System abschließen.",
+                "Schlüsselkarten programmieren, den WLAN-Hinweis und die Frühstückszeiten nennen und die Warteschlange freundlich steuern.",
+                "Ausweise und Zahlungsdaten auch bei vollem Empfang sorgfältig erfassen.",
+                "Kolleg:innen bei gleichzeitigem Andrang unterstützen und Gäste mit längerer Wartezeit kurz informieren."
+              ]
+            },
+            {
+              "id": "check-out",
+              "label_de": "Check-out",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "check-out",
+                  "rechnung"
+                ],
+                "tags": [
+                  "empfang"
+                ]
+              },
+              "texts_de": [
+                "Den Check-out durchführen, die Rechnung Position für Position erläutern und die Zahlung verbuchen.",
+                "Offene Posten wie Minibar oder Spa sachlich mit dem Gast klären und bei Bedarf die Fachabteilung fragen.",
+                "Die Schlüsselkarte einziehen, den Zimmerstatus auf abgereist setzen und den Gast verabschieden.",
+                "Bei frühem Check-out die Gepäckaufbewahrung anbieten und die Abreise im System vollständig abschließen."
+              ]
+            },
+            {
+              "id": "phone",
+              "label_de": "Telefon",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "telefon"
+                ],
+                "tags": [
+                  "anruf"
+                ]
+              },
+              "texts_de": [
+                "Anrufe mit der Hotelbegrüßung annehmen, das Anliegen notieren und an die zuständige Stelle weiterleiten.",
+                "Reservierungsanfragen am Telefon aufnehmen und die Verfügbarkeit im System prüfen.",
+                "Interne Gespräche mit Housekeeping, Küche oder Technik kurz und nachvollziehbar dokumentieren.",
+                "Bei gleichzeitigem Andrang am Tresen den Anrufer höflich um einen Moment bitten."
+              ]
+            },
+            {
+              "id": "reservation-change",
+              "label_de": "Reservierungsänderung",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "reservierung",
+                  "aenderung"
+                ],
+                "tags": [
+                  "buchung"
+                ]
+              },
+              "texts_de": [
+                "Die bestehende Reservierung suchen und den Änderungswunsch zu Datum, Zimmertyp oder Personenzahl aufnehmen.",
+                "Die Verfügbarkeit prüfen, die Änderung im System speichern und die neue Bestätigung erläutern.",
+                "Eine Stornierung oder einen No-Show nach Hausregel kennzeichnen und Sonderfälle an die Schichtleitung geben.",
+                "Gruppen- oder Firmenreservierungen nur nach den hinterlegten Konditionen anpassen."
+              ]
+            },
+            {
+              "id": "complaint",
+              "label_de": "Beschwerde",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "beschwerde"
+                ],
+                "tags": [
+                  "reklamation"
+                ]
+              },
+              "texts_de": [
+                "Die Beschwerde ruhig anhören, den Sachverhalt wiederholen und eine konkrete Lösung anbieten.",
+                "Housekeeping, Technik oder den Service informieren und den Gast über den nächsten Schritt auf dem Laufenden halten.",
+                "Den Vorgang im Schichtbericht festhalten und die Schichtleitung einbinden.",
+                "Nach der Klärung nachfragen, ob das Anliegen für den Gast zufriedenstellend gelöst ist."
+              ]
+            },
+            {
+              "id": "night-audit",
+              "label_de": "Night Audit",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "nacht",
+                "guest_situation": [
+                  "night-audit",
+                  "tagesabschluss"
+                ],
+                "tags": [
+                  "audit"
+                ]
+              },
+              "texts_de": [
+                "Beim Night Audit offene Buchungen, Zahlungen und den Zimmerstatus vor dem Tagesabschluss prüfen.",
+                "No-Shows und noch belegte Zimmer mit der Spätschicht abgleichen und im System kennzeichnen.",
+                "Tagesumsatz und offene Posten kontrollieren und Unstimmigkeiten der Schichtleitung melden.",
+                "Nach dem Abschluss die Listen für die Frühschicht und das Housekeeping bereitlegen."
+              ]
+            },
+            {
+              "id": "quiet-shift",
+              "label_de": "Ruhige Schicht",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "ruhig"
+                ],
+                "tags": [
+                  "vorbereitung"
+                ]
+              },
+              "texts_de": [
+                "In der ruhigen Phase die An- und Abreisen des Tages vorbereiten und die Gästelisten kontrollieren.",
+                "Schlüsselkarten, Formulare und Informationsmaterial am Empfang nachfüllen und den Tresen ordnen.",
+                "Offene E-Mails und Reservierungsanfragen bearbeiten und Rückfragen für die nächste Schicht notieren.",
+                "Hausinformationen zu Frühstück, Tagung und Technik mit den anderen Abteilungen abgleichen."
+              ]
+            },
+            {
+              "id": "group-arrival",
+              "label_de": "Gruppenanreise",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "spaet",
+                "guest_situation": [
+                  "gruppe",
+                  "anreise"
+                ],
+                "tags": [
+                  "check-in"
+                ]
+              },
+              "texts_de": [
+                "Die Gruppenanreise vorbereiten und Zimmerliste, Schlüsselkarten sowie Willkommensunterlagen vor dem Eintreffen bereitlegen.",
+                "Die Reiseleitung begrüßen, die Zimmerverteilung abstimmen und den Check-in der Gruppe zügig durchführen.",
+                "Hinweise zu Anreisezeit, Gepäck und Frühstück an Housekeeping und den Service weitergeben.",
+                "Nach der Anreise die Belegung im System prüfen und fehlende Namen oder Zahlungsarten nachtragen."
+              ]
+            }
           ]
         }
       ]
@@ -93,7 +434,9 @@
       "codes": [
         {
           "code": "Housekeeping",
-          "aliases": ["HK"],
+          "aliases": [
+            "HK"
+          ],
           "name_de": "Housekeeping",
           "department": "Housekeeping",
           "lernfeld": "Wirtschafts- und Sozialprozesse",
@@ -113,6 +456,90 @@
             "Unterstützung bei der Bettenaufbereitung und Nachfüllen der Verbrauchsmaterialien.",
             "Gemeinsame Kontrolle von Störungen und Meldung an die Rezeption.",
             "Sortierung und Vorbereitung von Wäsche sowie Unterstützung bei der Etagenorganisation."
+          ],
+          "conditions": [
+            {
+              "id": "abreisezimmer",
+              "label_de": "Abreisezimmer",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "abreise",
+                  "checkout-zimmer"
+                ],
+                "tags": [
+                  "reinigung"
+                ]
+              },
+              "texts_de": [
+                "Abreisezimmer nach dem Check-out vollständig reinigen und die Ausstattung nach Hotelstandard kontrollieren.",
+                "Minibar, Safe und vergessene Gegenstände prüfen und Fundsachen an die Rezeption melden.",
+                "Den Zimmerstatus nach der Endkontrolle auf sauber setzen und die Rezeption informieren."
+              ]
+            },
+            {
+              "id": "stayover",
+              "label_de": "Bleiberzimmer",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "stayover",
+                  "bleiber"
+                ],
+                "tags": [
+                  "reinigung"
+                ]
+              },
+              "texts_de": [
+                "Bleiberzimmer diskret reinigen, die Betten aufbereiten und Verbrauchsmaterialien nachfüllen.",
+                "Persönliche Gegenstände der Gäste nicht verlegen und den Hinweis Bitte nicht stören beachten.",
+                "Fehlende Handtücher oder Pflegeprodukte ergänzen und den Zimmerstatus aktualisieren."
+              ]
+            },
+            {
+              "id": "waesche",
+              "label_de": "Wäsche und Etage",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "waesche"
+                ],
+                "tags": [
+                  "etage"
+                ]
+              },
+              "texts_de": [
+                "Schmutzwäsche sortieren, den Wäschewagen bestücken und saubere Wäsche auf die Etage bringen.",
+                "Den Wäschebestand im Lager kontrollieren und Fehlmengen der Hausdame melden.",
+                "Das Etagenoffice aufräumen und die Reinigungsmittel nach Schichtplan auffüllen."
+              ]
+            },
+            {
+              "id": "stoerung",
+              "label_de": "Störung melden",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "stoerung"
+                ],
+                "tags": [
+                  "technik"
+                ]
+              },
+              "texts_de": [
+                "Defekte an Licht, Fernseher, Klima oder Sanitär im Zimmer festhalten und an Rezeption oder Technik melden.",
+                "Das Zimmer bis zur Freigabe kennzeichnen, damit es nicht vorzeitig verkauft wird.",
+                "Nach der Reparatur eine kurze Nachkontrolle durchführen und den Status an die Rezeption zurückmelden."
+              ]
+            }
           ]
         }
       ]
@@ -142,6 +569,90 @@
             "Nachbereitung der Tagungsräume nach Veranstaltungsende.",
             "Unterstützung bei Coffee-Breaks und Umräumen der Säle.",
             "Kontrolle der Tagungsausstattung (Blöcke, Stifte, Wasser) während der Veranstaltung."
+          ],
+          "conditions": [
+            {
+              "id": "coffee-break",
+              "label_de": "Coffee-Break",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "coffee-break",
+                  "pause"
+                ],
+                "tags": [
+                  "tagung"
+                ]
+              },
+              "texts_de": [
+                "Den Coffee-Break vor der Pause aufbauen und Heißgetränke, Kaltgetränke, Gebäck sowie Geschirr bereitstellen.",
+                "Während der Pause den Nachschub kontrollieren, Geschirr abräumen und die Station sauber halten.",
+                "Nach der Pause Reste abziehen und den Raum für den nächsten Programmpunkt herrichten."
+              ]
+            },
+            {
+              "id": "raum-nachbereitung",
+              "label_de": "Nachbereitung Tagungsraum",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "spaet",
+                "guest_situation": [
+                  "nachbereitung"
+                ],
+                "tags": [
+                  "tagungsraum"
+                ]
+              },
+              "texts_de": [
+                "Den Tagungsraum nach Veranstaltungsende abräumen, die Tische reinigen und die Bestuhlung zurückbauen.",
+                "Beamer, Mikrofon und Flipchart kontrollieren und Auffälligkeiten der Tagungsleitung melden.",
+                "Die Ausstattung auf Vollständigkeit prüfen und den Raum für die nächste Buchung vorbereiten."
+              ]
+            },
+            {
+              "id": "saal-umraum",
+              "label_de": "Umräumen der Säle",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "umraum",
+                  "bestuhlung"
+                ],
+                "tags": [
+                  "saal"
+                ]
+              },
+              "texts_de": [
+                "Die Bestuhlung nach Plan auf parlamentarisch, Theater oder U-Form umbauen.",
+                "Tische, Stühle und Technik mit dem Tagungsteam abstimmen und die Fluchtwege freihalten.",
+                "Namensschilder, Blöcke und Wasser nach der neuen Ordnung erneut platzieren."
+              ]
+            },
+            {
+              "id": "ausstattung-kontrolle",
+              "label_de": "Ausstattung während der Tagung",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [
+                  "ausstattung"
+                ],
+                "tags": [
+                  "tagung"
+                ]
+              },
+              "texts_de": [
+                "Während der Tagung Blöcke, Stifte und Wasser auf den Tischen kontrollieren und nachlegen.",
+                "Technische Rückmeldungen der Teilnehmer aufnehmen und an die zuständige Stelle weitergeben.",
+                "Raumtemperatur und Beleuchtung bei Bedarf mit der Technik oder der Tagungsleitung abstimmen."
+              ]
+            }
           ]
         },
         {
@@ -163,6 +674,70 @@
             "Vorbereitung des Frühstücks und der Tagungsräume (MEP) inkl. Bestuhlung und Grundausstattung.",
             "Aufbau und Dekoration der Tagungstische sowie Bereitstellung von Getränken für die Teilnehmer.",
             "Abstimmung mit dem Tagungsteam zu Beginn und während der Veranstaltung."
+          ],
+          "conditions": [
+            {
+              "id": "mep-bestuhlung",
+              "label_de": "Bestuhlung und Grundausstattung MEP",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "bestuhlung"
+                ],
+                "tags": [
+                  "mep"
+                ]
+              },
+              "texts_de": [
+                "Die Tagungsräume im MEP nach Plan bestuhlen und Blöcke, Stifte und Wasser auflegen.",
+                "Technikanschlüsse und die Präsentationsfläche vor Beginn kurz prüfen.",
+                "Abweichungen vom Bestuhlungsplan mit dem Tagungsteam klären, bevor die Teilnehmer eintreffen."
+              ]
+            },
+            {
+              "id": "mep-fruehstueck",
+              "label_de": "Frühstück und Tagungsgetränke",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "fruehstueck",
+                  "getraenke"
+                ],
+                "tags": [
+                  "mep"
+                ]
+              },
+              "texts_de": [
+                "Frühstücksbereich und Tagungsgetränke parallel vorbereiten und die Menge an die Teilnehmerzahl anpassen.",
+                "Kaffee, Tee und Wasser an den Tagungsstationen bereitstellen und rechtzeitig nachfüllen.",
+                "Offene Punkte zwischen Frühstück und Tagung im Team kurz festhalten."
+              ]
+            },
+            {
+              "id": "mep-abstimmung",
+              "label_de": "Abstimmung mit dem Tagungsteam",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "abstimmung"
+                ],
+                "tags": [
+                  "mep",
+                  "tagung"
+                ]
+              },
+              "texts_de": [
+                "Zu Schichtbeginn Ablauf, Zeiten und besondere Wünsche mit dem Tagungsteam durchgehen.",
+                "Änderungen bei Pausenzeit oder Personenzahl aufnehmen und an Küche oder Service weitergeben.",
+                "Am Ende der Vorbereitung den Raum gemeinsam freigeben und offene Mängel notieren."
+              ]
+            }
           ]
         },
         {
@@ -182,6 +757,49 @@
           "templates_de": [
             "Frühschicht im Bereich Frühstück und Tagung mit wechselnden Einsätzen nach Dienstplan.",
             "Unterstützung bei der Übergabe zwischen Frühstücks- und Tagungsteam während der Schicht."
+          ],
+          "conditions": [
+            {
+              "id": "fs2-fruehschicht",
+              "label_de": "Frühschicht Frühstück und Tagung",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "fruehschicht"
+                ],
+                "tags": [
+                  "fs2"
+                ]
+              },
+              "texts_de": [
+                "Die Frühschicht FS2 beginnen und den Einsatzort Frühstück oder Tagung laut Dienstplan klären.",
+                "Je nach Einsatz das Buffet, den Tagungsraum oder beide Bereiche herrichten und die ersten Gäste betreuen.",
+                "Material und Getränke für den Vormittag bereitstellen und Fehlmengen sofort melden."
+              ]
+            },
+            {
+              "id": "fs2-uebergabe",
+              "label_de": "Übergabe Frühstück zu Tagung",
+              "when": {
+                "day_type": "arbeit",
+                "weekday": null,
+                "time_band": "frueh",
+                "guest_situation": [
+                  "uebergabe"
+                ],
+                "tags": [
+                  "fs2",
+                  "tagung"
+                ]
+              },
+              "texts_de": [
+                "Offene Aufgaben, Uhrzeiten und Gästezahlen zwischen Frühstücks- und Tagungsteam übergeben.",
+                "Nach dem Frühstück in den Tagungsbereich wechseln und die Pausenversorgung unterstützen.",
+                "Zum Schichtende festhalten, was erledigt ist und was die nächste Schicht übernimmt."
+              ]
+            }
           ]
         }
       ]
@@ -208,6 +826,64 @@
             "Unterricht in der Berufsschule: Theorie zu Hotelfachmann/-frau, Rechnungswesen und Fachkunde.",
             "Bearbeitung von Übungsaufgaben und Vorbereitung auf anstehende Klassenarbeiten.",
             "Fachpraktische Übungen und Projektarbeit im schulischen Lernfeld."
+          ],
+          "conditions": [
+            {
+              "id": "unterricht-theorie",
+              "label_de": "Theorieunterricht",
+              "when": {
+                "day_type": "schule",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [],
+                "tags": [
+                  "unterricht",
+                  "theorie"
+                ]
+              },
+              "texts_de": [
+                "Im Theorieunterricht zu Hotelfach, Fachkunde und betrieblichen Abläufen mitarbeiten und mitschreiben.",
+                "Offene Fragen im Unterricht klären und den Bezug zu Service, Rezeption oder Housekeeping notieren.",
+                "Die behandelten Lerninhalte für den Ausbildungsnachweis verständlich zusammenfassen."
+              ]
+            },
+            {
+              "id": "klassenarbeit",
+              "label_de": "Übung und Klassenarbeit",
+              "when": {
+                "day_type": "schule",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [],
+                "tags": [
+                  "klassenarbeit",
+                  "uebung"
+                ]
+              },
+              "texts_de": [
+                "Übungsaufgaben zu Rechnungswesen und Fachkunde bearbeiten und die Ergebnisse vergleichen.",
+                "Den Stoff für eine anstehende Klassenarbeit wiederholen und Beispielaufgaben durchrechnen.",
+                "Die Rückmeldung der Lehrkraft zu Fehlern notieren und die Verbesserung für die nächste Stunde planen."
+              ]
+            },
+            {
+              "id": "projekt-schule",
+              "label_de": "Projektarbeit",
+              "when": {
+                "day_type": "schule",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [],
+                "tags": [
+                  "projekt"
+                ]
+              },
+              "texts_de": [
+                "Eine fachpraktische Übung oder Projektarbeit im schulischen Lernfeld durchführen.",
+                "Die Arbeitsschritte dokumentieren und das Ergebnis im Team vorstellen.",
+                "Den Bezug zum betrieblichen Ausbildungsplan herstellen und offene Punkte für die nächste Schulwoche notieren."
+              ]
+            }
           ]
         }
       ]
@@ -219,7 +895,9 @@
       "codes": [
         {
           "code": "frei",
-          "aliases": ["Ausgang"],
+          "aliases": [
+            "Ausgang"
+          ],
           "name_de": "Frei / Ausgang",
           "department": "-",
           "lernfeld": null,
@@ -233,6 +911,43 @@
           ],
           "templates_de": [
             "Frei / Ausgang laut Dienstplan — kein betrieblicher Ausbildungsnachweis."
+          ],
+          "conditions": [
+            {
+              "id": "freier-tag",
+              "label_de": "Freier Tag laut Dienstplan",
+              "when": {
+                "day_type": "frei",
+                "weekday": null,
+                "time_band": "any",
+                "guest_situation": [],
+                "tags": [
+                  "frei"
+                ]
+              },
+              "texts_de": [
+                "Frei laut Dienstplan — an diesem Tag findet kein betrieblicher Einsatz statt.",
+                "Es wird kein Ausbildungsnachweis geschrieben und nichts an BLok übergeben."
+              ]
+            },
+            {
+              "id": "ausgang-samstag",
+              "label_de": "Ausgang am Samstag",
+              "when": {
+                "day_type": "frei",
+                "weekday": "sa",
+                "time_band": "any",
+                "guest_situation": [],
+                "tags": [
+                  "ausgang",
+                  "wochenende"
+                ]
+              },
+              "texts_de": [
+                "Ausgang am Samstag laut Dienstplan, ohne Tätigkeit im Betrieb.",
+                "Der Tag bleibt frei und wird nicht als Arbeitstag an BLok gemeldet."
+              ]
+            }
           ]
         }
       ]

@@ -89,6 +89,16 @@ class TestDashboard(unittest.TestCase):
 
                 saved = json.loads(katalog_path.read_text(encoding="utf-8"))
                 self.assertEqual(saved["note"], "dashboard-test-note")
+                saved_rez = next(
+                    c
+                    for abt in saved["abteilungen"]
+                    for c in abt["codes"]
+                    if c["code"] == "Rezeption"
+                )
+                self.assertIn(
+                    "check-in-rush",
+                    [cond["id"] for cond in saved_rez["conditions"]],
+                )
 
                 conn = db.connect(db_path)
                 n = conn.execute(

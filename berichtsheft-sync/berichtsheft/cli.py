@@ -58,7 +58,8 @@ def cmd_catalog(args: argparse.Namespace) -> int:
         catalog.export_legacy_files()
         conn.close()
         print(
-            f"✓ Reload DB: {stats['templates']} templates, {stats['areas']} areas"
+            f"✓ Reload DB: {stats['templates']} templates, {stats['areas']} areas, "
+            f"{stats.get('conditions', 0)} conditions"
         )
         print(f"✓ Sync file: {catalog.AREAS_PATH.name}, {catalog.TEMPLATES_PATH.name}")
 
