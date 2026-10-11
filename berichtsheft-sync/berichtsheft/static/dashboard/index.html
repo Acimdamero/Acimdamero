@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Berichtsheft Ops</title>
-  <link rel="stylesheet" href="/dashboard/static/style.css" />
+  <link rel="stylesheet" href="/dashboard/static/style.css?v=hari-layout" />
 </head>
 <body>
   <div class="shell">
@@ -47,58 +47,60 @@
       </section>
 
       <section id="panel-hari" class="panel">
-        <div id="hari-banner" class="banner warn">
+        <div id="hari-banner" class="banner warn hari-banner">
           <strong id="hari-banner-title">Hari &amp; BLok</strong>
           <span id="hari-banner-detail">Pilih tanggal, tempel frasa, lalu simpan atau isi BLok.</span>
         </div>
-        <div class="hari-controls">
-          <button type="button" id="hari-prev" aria-label="Hari sebelumnya">‹ Hari</button>
-          <label>Tanggal <input id="hari-date" type="date" /></label>
-          <button type="button" id="hari-next" aria-label="Hari berikutnya">Hari ›</button>
-          <label>Bulan <select id="hari-month" aria-label="Bulan"></select></label>
-          <label>Tahun <select id="hari-year" aria-label="Tahun"></select></label>
-          <span id="hari-weekday" class="hint"></span>
-        </div>
-        <div class="hari-hours">
-          <label>Mulai <input id="hari-start" type="time" /></label>
-          <label>Selesai <input id="hari-end" type="time" /></label>
-          <label>Jenis
-            <select id="hari-type">
-              <option value="arbeit">arbeit</option>
-              <option value="schule">schule</option>
-              <option value="frei">frei</option>
-            </select>
-          </label>
-          <span id="hari-duration" class="duration-label">Durasi: —</span>
-          <button type="button" id="hari-save-hours">Simpan jam</button>
+        <div class="hari-toolbar" role="toolbar" aria-label="Hari dan aksi BLok">
+          <div class="hari-cluster">
+            <button type="button" id="hari-prev" aria-label="Hari sebelumnya">‹</button>
+            <label>Tanggal <input id="hari-date" type="date" /></label>
+            <button type="button" id="hari-next" aria-label="Hari berikutnya">›</button>
+            <label>Bulan <select id="hari-month" aria-label="Bulan"></select></label>
+            <label>Tahun <select id="hari-year" aria-label="Tahun"></select></label>
+            <span id="hari-weekday" class="hari-weekday"></span>
+          </div>
+          <div class="hari-cluster">
+            <label>Mulai <input id="hari-start" type="time" /></label>
+            <label>Selesai <input id="hari-end" type="time" /></label>
+            <label>Jenis
+              <select id="hari-type">
+                <option value="arbeit">arbeit</option>
+                <option value="schule">schule</option>
+                <option value="frei">frei</option>
+              </select>
+            </label>
+            <span id="hari-duration" class="duration-label">Durasi: —</span>
+            <button type="button" id="hari-save-hours">Simpan jam</button>
+          </div>
+          <div class="hari-cluster hari-actions">
+            <button type="button" id="hari-save-log" class="primary">Simpan log</button>
+            <button type="button" id="hari-draft">Buat draft</button>
+            <button type="button" id="hari-dry" title="Isi BLok (dry-run)">Dry-run</button>
+            <button type="button" id="hari-live" title="Isi BLok live">Live</button>
+          </div>
         </div>
         <div class="hari-layout">
-          <div class="hari-col">
+          <div class="hari-col hari-chat">
             <h2>Catatan hari ini</h2>
             <div id="hari-logs" class="feed hari-feed"></div>
-            <h2>Frasa katalog</h2>
-            <p class="hint">Klik simbol untuk menempel kalimat Jerman ke kolom tulis. Lalu Simpan log agar masuk draft BLok.</p>
-            <div id="hari-phrases" class="phrase-groups"></div>
             <textarea id="hari-composer" class="hari-composer" placeholder="Tulis kegiatan atau klik simbol frasa…"></textarea>
             <div class="hari-photos">
-              <h2>Foto hari ini</h2>
+              <span class="hari-photo-label">Foto</span>
               <div id="hari-thumbs" class="hari-thumbs"></div>
-              <div class="actions">
-                <label class="file-btn">Tambah foto
-                  <input id="hari-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden />
-                </label>
-                <button type="button" id="hari-upload-blok">Upload ke BLok</button>
-              </div>
+              <label class="file-btn">Tambah foto
+                <input id="hari-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden />
+              </label>
+              <button type="button" id="hari-upload-blok">Upload ke BLok</button>
             </div>
-            <div class="actions hari-actions">
-              <button type="button" id="hari-save-log" class="primary">Simpan log</button>
-              <button type="button" id="hari-draft">Buat draft</button>
-              <button type="button" id="hari-dry">Isi BLok (dry-run)</button>
-              <button type="button" id="hari-live">Isi BLok live</button>
+            <div class="phrase-wrap">
+              <h2>Frasa katalog</h2>
+              <p class="hint phrase-hint">Klik simbol untuk menempel kalimat Jerman. Simpan log agar masuk draft BLok.</p>
+              <div id="hari-phrases" class="phrase-groups"></div>
             </div>
             <pre id="hari-msg" class="msg"></pre>
           </div>
-          <div class="hari-col">
+          <div class="hari-col hari-preview">
             <h2>Preview BLok</h2>
             <pre id="hari-draft-text" class="msg hari-draft"></pre>
             <p id="hari-preview-empty" class="hint">Belum ada preview untuk tanggal ini.</p>
@@ -250,6 +252,6 @@
       </section>
     </main>
   </div>
-  <script src="/dashboard/static/app.js"></script>
+  <script src="/dashboard/static/app.js?v=hari-layout"></script>
 </body>
 </html>

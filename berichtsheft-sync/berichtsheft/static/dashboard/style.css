@@ -397,98 +397,198 @@ button.cta-blok.secondary {
 .cmd-list { margin: 0.5rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.8rem; }
 .meta { color: var(--muted); font-size: 0.85rem; }
 
-.hari-controls, .hari-hours, .hari-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 0.65rem;
-  margin-bottom: 0.85rem;
-}
-.hari-controls label, .hari-hours label {
+.main:has(#panel-hari.active) {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--muted);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 0.75rem;
 }
-.hari-controls input, .hari-controls select,
-.hari-hours input, .hari-hours select {
+.main:has(#panel-hari.active) .topbar {
+  flex: 0 0 auto;
+  margin-bottom: 0.6rem;
+}
+#panel-hari.panel.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+#panel-hari .hari-banner {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  flex: 0 0 auto;
+}
+#panel-hari .hari-banner strong { white-space: nowrap; }
+#panel-hari .hari-banner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hari-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.hari-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  min-width: 0;
+}
+.hari-cluster + .hari-cluster {
+  padding-left: 0.7rem;
+  border-left: 1px solid var(--line);
+}
+.hari-toolbar label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  min-width: 0;
+}
+.hari-toolbar input,
+.hari-toolbar select {
   background: var(--bg);
   border: 1px solid var(--line);
   color: var(--text);
-  padding: 0.4rem 0.5rem;
+  padding: 0.3rem 0.45rem;
   border-radius: 4px;
   font: inherit;
+  font-size: 0.85rem;
+  min-height: 40px;
+  max-width: 100%;
 }
+.hari-toolbar button,
+#panel-hari .file-btn {
+  min-height: 40px;
+  white-space: nowrap;
+}
+.hari-actions { margin-left: auto; }
+.hari-weekday,
 .duration-label {
   color: var(--muted);
-  font-size: 0.85rem;
-  padding-bottom: 0.45rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
+.duration-label { padding: 0; }
+
 .hari-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: 1rem;
-  align-items: start;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+  gap: 0.7rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  align-items: stretch;
 }
-.hari-col h2 {
-  font-size: 0.9rem;
-  color: var(--muted);
-  font-weight: 600;
-  margin: 0.35rem 0;
-}
-.hari-feed { max-height: 220px; margin-bottom: 0.75rem; }
-#panel-hari textarea.hari-composer {
-  min-height: 7.5rem;
-  margin: 0.6rem 0 0.75rem;
-}
-.phrase-groups {
+.hari-col {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  max-height: 240px;
-  overflow: auto;
-  padding-right: 0.2rem;
+  gap: 0.4rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem 0.65rem;
+  overflow: hidden;
 }
-.phrase-group-title {
-  font-size: 0.75rem;
+.hari-col h2 {
+  font-size: 0.8rem;
   color: var(--muted);
-  margin-bottom: 0.3rem;
+  font-weight: 600;
+  margin: 0;
+  flex: 0 0 auto;
 }
-.phrase-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.phrase-btn {
-  display: inline-flex;
+#panel-hari .hari-feed {
+  flex: 1 1 auto;
+  min-height: 5.5rem;
+  max-height: none;
+  margin: 0;
+  background: #0c1015;
+  overscroll-behavior: contain;
+}
+#panel-hari textarea.hari-composer {
+  flex: 0 0 auto;
+  min-height: 4.6rem;
+  height: 5.2rem;
+  max-height: 8.5rem;
+  margin: 0;
+  resize: vertical;
+}
+.hari-photos {
+  flex: 0 0 auto;
+  display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  text-align: left;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
 }
-.phrase-btn .sym { font-size: 1rem; line-height: 1; }
-.hari-photos { margin: 0.25rem 0 0.85rem; }
+.hari-photo-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
 .hari-thumbs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.55rem;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+}
+.hari-thumbs .hint,
+.hari-photo-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 .hari-thumb {
-  width: 96px;
-  background: var(--bg-elev);
+  width: 72px;
+  flex: 0 0 auto;
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
 }
 .hari-thumb img {
   display: block;
-  width: 96px;
-  height: 72px;
+  width: 72px;
+  height: 48px;
   object-fit: cover;
 }
 .hari-thumb span {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: var(--muted);
-  padding: 0.2rem 0.35rem;
+  padding: 0.1rem 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .file-btn {
   display: inline-flex;
@@ -497,14 +597,121 @@ button.cta-blok.secondary {
   background: var(--bg-soft);
   color: var(--text);
   border-radius: 6px;
-  padding: 0.45rem 0.8rem;
+  padding: 0.35rem 0.7rem;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  flex: 0 0 auto;
 }
-.hari-draft {
-  max-height: 28vh;
-  min-height: 6rem;
+.phrase-wrap {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.phrase-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  flex: 0 0 auto;
+}
+.phrase-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 180px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.15rem;
+}
+.phrase-group {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 0 0.45rem 0.15rem;
+  min-width: 0;
+}
+.phrase-group.is-today { border-color: #2f5f4a; }
+.phrase-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  margin: 0;
+  cursor: pointer;
+  font-size: 0.8rem;
   color: var(--text);
+  list-style: none;
+}
+.phrase-group-title::-webkit-details-marker { display: none; }
+.phrase-group-title::before {
+  content: "▸";
+  color: var(--muted);
+  width: 0.75rem;
+  flex: 0 0 auto;
+}
+.phrase-group[open] > .phrase-group-title::before { content: "▾"; }
+.phrase-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phrase-today {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--ok);
+  font-size: 0.68rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+}
+.phrase-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0 0 0.4rem 1.15rem;
+  min-width: 0;
+}
+.phrase-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 36px;
+  max-width: 100%;
+  font-size: 0.78rem;
+  text-align: left;
+  white-space: normal;
+}
+.phrase-btn .sym { font-size: 1rem; line-height: 1; flex: 0 0 auto; }
+#panel-hari .hari-msg { flex: 0 0 auto; margin: 0; max-height: 4.5rem; }
+#panel-hari .hari-msg:empty { display: none; }
+
+.hari-preview { min-height: 280px; }
+#panel-hari .hari-draft {
+  flex: 1 1 auto;
+  min-height: 6.5rem;
+  max-height: none;
+  margin: 0;
+  color: var(--text);
+}
+#panel-hari:has(#hari-preview-frame:not(.hidden)) .hari-draft,
+#panel-hari:has(#hari-preview-shot:not(.hidden)) .hari-draft {
+  flex: 0 1 auto;
+  max-height: 34%;
+}
+#panel-hari #hari-preview-empty { margin: 0; flex: 0 0 auto; }
+#panel-hari #hari-preview-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+  margin: 0;
+}
+#panel-hari .blok-shot {
+  flex: 0 1 auto;
+  max-height: 180px;
+  width: 100%;
+  margin: 0;
 }
 #hari-live:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -512,5 +719,37 @@ button.cta-blok.secondary {
   .shell { grid-template-columns: 1fr; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   nav { flex-direction: row; flex-wrap: wrap; }
-  .split3, .split2, .hari-layout { grid-template-columns: 1fr; }
+  .split3, .split2 { grid-template-columns: 1fr; }
+  .main:has(#panel-hari.active) {
+    height: auto;
+    overflow: auto;
+  }
+  #panel-hari.panel.active {
+    height: auto;
+    overflow: visible;
+  }
+  .hari-layout { grid-template-columns: minmax(0, 1fr); }
+  .hari-cluster + .hari-cluster {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .hari-actions { margin-left: 0; }
+  .hari-toolbar button,
+  .hari-toolbar input,
+  .hari-toolbar select,
+  #panel-hari .file-btn,
+  .phrase-group-title,
+  .phrase-btn {
+    min-height: 44px;
+  }
+  #panel-hari .hari-feed {
+    flex: none;
+    min-height: 8rem;
+    max-height: 38vh;
+  }
+  .hari-col { overflow: visible; }
+  .phrase-groups { max-height: 180px; }
+  #panel-hari #hari-preview-frame { min-height: 280px; height: 52vh; }
+  .hari-preview { min-height: 280px; }
+  #panel-hari .hari-banner span { white-space: normal; }
 }

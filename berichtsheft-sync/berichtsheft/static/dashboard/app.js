@@ -707,12 +707,27 @@
       root.appendChild(empty);
       return;
     }
-    groups.forEach((group) => {
-      const block = document.createElement("div");
-      const title = document.createElement("div");
+    const anyToday = groups.some((group) => group.for_day);
+    groups.forEach((group, index) => {
+      const block = document.createElement("details");
+      block.className = group.for_day ? "phrase-group is-today" : "phrase-group";
+      block.open = group.for_day || (!anyToday && index === 0);
+      const title = document.createElement("summary");
       title.className = "phrase-group-title";
-      const dayMark = group.for_day ? " · hari ini" : "";
-      title.textContent = `${group.symbol} ${group.code}${group.name_de ? " — " + group.name_de : ""}${dayMark}`;
+      const sym = document.createElement("span");
+      sym.className = "sym";
+      sym.setAttribute("aria-hidden", "true");
+      sym.textContent = group.symbol || "✦";
+      const name = document.createElement("span");
+      name.className = "phrase-name";
+      name.textContent = `${group.code}${group.name_de ? " — " + group.name_de : ""}`;
+      title.append(sym, name);
+      if (group.for_day) {
+        const mark = document.createElement("span");
+        mark.className = "phrase-today";
+        mark.textContent = "hari ini";
+        title.append(mark);
+      }
       const row = document.createElement("div");
       row.className = "phrase-row";
       (group.buttons || []).forEach((button) => {
@@ -720,12 +735,13 @@
         el.type = "button";
         el.className = "phrase-btn";
         el.title = button.text || "";
-        const sym = document.createElement("span");
-        sym.className = "sym";
-        sym.textContent = group.symbol || "✦";
+        const chip = document.createElement("span");
+        chip.className = "sym";
+        chip.setAttribute("aria-hidden", "true");
+        chip.textContent = group.symbol || "✦";
         const label = document.createElement("span");
         label.textContent = button.label || button.kind || "Frasa";
-        el.append(sym, label);
+        el.append(chip, label);
         el.addEventListener("click", () => {
           const box = document.getElementById("hari-composer");
           const text = (button.text || "").trim();
@@ -750,8 +766,8 @@
     const photos = (attachments || []).filter((item) => item.media_url || item.blok_status);
     if (!photos.length) {
       const empty = document.createElement("p");
-      empty.className = "hint";
-      empty.textContent = "Belum ada foto untuk tanggal ini.";
+      empty.className = "hint hari-photo-empty";
+      empty.textContent = "Belum ada foto.";
       root.appendChild(empty);
       return;
     }
