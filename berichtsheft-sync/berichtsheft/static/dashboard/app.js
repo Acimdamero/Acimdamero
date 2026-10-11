@@ -865,10 +865,19 @@
     banner.className = `banner ${live ? "ok" : "warn"}`;
     document.getElementById("hari-banner-title").textContent = label;
     let detail = data.message || "";
-    if (data.fallback_dry_run) {
+    if (data.live_error) {
+      detail = `Live gagal: ${data.live_error}. ${label}`;
+    } else if (data.fallback_dry_run) {
       detail = "Kredensial live tidak dipakai. Preview dry-run lokal.";
+    } else if (label === "tersimpan + dry-run") {
+      detail = "Draft lokal dan HTML preview siap di panel kanan.";
+    } else if (label === "live terkirim") {
+      detail = "Hari ini terkirim lewat worker BLok.";
+    } else if (label === "upload pending") {
+      detail = data.message || "Foto tersimpan lokal. Upload BLok menunggu kredensial.";
+    } else if (label === "tersimpan") {
+      detail = "Draft lokal tersimpan. Dry-run belum dijalankan.";
     }
-    if (data.live_error) detail = `Live gagal: ${data.live_error}. ${label}`;
     document.getElementById("hari-banner-detail").textContent = detail || label;
     setMsg("hari-msg", detail && detail !== label ? `${label} — ${detail}` : label, live || !data.live_error);
   }
