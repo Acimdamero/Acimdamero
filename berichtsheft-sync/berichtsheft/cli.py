@@ -58,7 +58,8 @@ def cmd_catalog(args: argparse.Namespace) -> int:
         catalog.export_legacy_files()
         conn.close()
         print(
-            f"✓ Reload DB: {stats['templates']} templates, {stats['areas']} areas"
+            f"✓ Reload DB: {stats['templates']} templates, {stats['areas']} areas, "
+            f"{stats.get('conditions', 0)} conditions"
         )
         print(f"✓ Sync file: {catalog.AREAS_PATH.name}, {catalog.TEMPLATES_PATH.name}")
 
@@ -219,8 +220,16 @@ def cmd_serve(args: argparse.Namespace) -> int:
     if args.port:
         port = args.port
     print(f"API http://{host}:{port}")
+    print(f"Dashboard http://{host}:{port}/dashboard")
     uvicorn.run("berichtsheft.api_server:app", host=host, port=port, reload=False)
     return 0
+
+
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """Start API server and print dashboard URL (same as serve)."""
+    print("Berichtsheft ops dashboard di-host oleh API server.")
+    print("Docs: docs/DASHBOARD.md")
+    return cmd_serve(args)
 
 
 def cmd_bot(_: argparse.Namespace) -> int:
@@ -293,6 +302,75 @@ def cmd_telegram_check(_: argparse.Namespace) -> int:
         return 0 if api_ok else 1
     print(f"✗ {result.get('error')}")
     return 1
+
+
+def cmd_menu_push(_: argparse.Namespace) -> int:
+    """Paksa refresh menu ☰ + keyboard ke chat Telegram terakhir."""
+    from berichtsheft.config_loader import load_dotenv
+    from berichtsheft.telegram_bot import (
+        _saved_chat_id,
+        push_menu_to_chat,
+        register_bot_commands,
+    )
+
+    load_dotenv()
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        print("✗ TELEGRAM_BOT_TOKEN kosong di .env")
+        return 1
+    if register_bot_commands(token):
+        print("✓ setMyCommands OK")
+    else:
+        print("⚠ setMyCommands gagal")
+    chat_id = _saved_chat_id()
+    if not chat_id:
+        print("⚠ Belum ada chat_id tersimpan. Kirim /start dulu di Telegram, lalu ulang:")
+        print("  python3 -m berichtsheft menu-push")
+        return 0
+    push_menu_to_chat(token, chat_id)
+    print(f"✓ Menu dikirim ke chat_id={chat_id} — cek HP sekarang")
+    return 0
+
+
+def cmd_wa_check(_: argparse.Namespace) -> int:
+    from berichtsheft.whatsapp_bot import check_waha
+
+    result = check_waha()
+    if not result.get("ok"):
+        print(f"✗ WAHA: {result.get('error')}")
+        print("  Pastikan Docker WAHA jalan: docker compose -f mac-iphone-automation/docker/docker-compose.waha.yml up -d")
+        return 1
+    print(f"✓ WAHA {result['base']} session={result['session']}")
+    if result.get("allowed"):
+        print(f"✓ Nomor diizinkan: {', '.join(result.get('allowed_numbers') or [])}")
+    else:
+        print("⚠ WHATSAPP_ALLOWED_NUMBER belum diisi di .env (contoh: 6281234567890)")
+    return 0
+
+
+def cmd_wa_bot(_: argparse.Namespace) -> int:
+    from berichtsheft.whatsapp_bot import run_polling
+
+    run_polling()
+    return 0
+
+
+def cmd_wa_menu_push(_: argparse.Namespace) -> int:
+    from berichtsheft.whatsapp_bot import push_menu
+
+    try:
+        push_menu()
+    except SystemExit as e:
+        print(f"✗ {e}")
+        return 1
+    except Exception as e:
+        print(f"✗ wa-menu-push gagal: {e}")
+        print(
+            "  Pastikan WAHA jalan di Mac (Docker :3000), session WORKING, "
+            "lalu ulangi. Lihat docs/WHATSAPP.md"
+        )
+        return 1
+    return 0
 
 
 def cmd_telegram_init(_: argparse.Namespace) -> int:
@@ -398,6 +476,94 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_sync_url_token(args: argparse.Namespace) -> tuple[str, str]:
+    from berichtsheft import sync_bridge
+    from berichtsheft.config_loader import load_dotenv
+
+    load_dotenv()
+    cfg = sync_bridge.load_sync_config()
+    url = (
+        (args.url or "").strip()
+        or os.environ.get("BERICHTSHEFT_REMOTE_API", "").strip()
+        or cfg.get("remote_api_url")
+        or os.environ.get("BERICHTSHEFT_API", "").strip()
+    )
+    token = (
+        (args.token or "").strip()
+        or os.environ.get("SYNC_TOKEN", "").strip()
+        or os.environ.get("DASHBOARD_TOKEN", "").strip()
+    )
+    if not url:
+        print(
+            "✗ URL kosong — pass --url atau set BERICHTSHEFT_REMOTE_API / "
+            "data/sync_config.json",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if not token:
+        print(
+            "✗ Token kosong — pass --token atau set SYNC_TOKEN / DASHBOARD_TOKEN",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    return url.rstrip("/"), token
+
+
+def cmd_sync_pull(args: argparse.Namespace) -> int:
+    from berichtsheft import sync_bridge
+
+    url, token = _resolve_sync_url_token(args)
+    try:
+        result = sync_bridge.cli_sync_pull(
+            url,
+            token,
+            include_attachment_files=args.files,
+            apply=not args.dry_run,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"✗ sync-pull gagal: {e}", file=sys.stderr)
+        cfg = sync_bridge.load_sync_config()
+        cfg["last_error"] = str(e)
+        sync_bridge.save_sync_config(cfg)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(f"✓ sync-pull dari {url}")
+    return 0
+
+
+def cmd_sync_push(args: argparse.Namespace) -> int:
+    from berichtsheft import sync_bridge
+
+    url, token = _resolve_sync_url_token(args)
+    try:
+        result = sync_bridge.cli_sync_push(
+            url,
+            token,
+            include_attachment_files=args.files,
+            mode=args.mode,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"✗ sync-push gagal: {e}", file=sys.stderr)
+        cfg = sync_bridge.load_sync_config()
+        cfg["last_error"] = str(e)
+        sync_bridge.save_sync_config(cfg)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(f"✓ sync-push ke {url}")
+    return 0
+
+
+def cmd_sync_status(_: argparse.Namespace) -> int:
+    from berichtsheft import sync_bridge
+
+    conn = db.connect()
+    db.init_schema(conn)
+    summary = sync_bridge.status_summary(conn)
+    conn.close()
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Berichtsheft-Sync — Hotelfachmann")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -477,9 +643,16 @@ def main() -> int:
     p_test.add_argument("--service", default="blok")
     p_test.set_defaults(func=cmd_credentials_test)
 
-    p_srv = sub.add_parser("serve", help="API server")
+    p_srv = sub.add_parser("serve", help="API server + /dashboard")
     p_srv.add_argument("--port", type=int)
     p_srv.set_defaults(func=cmd_serve)
+
+    p_dash = sub.add_parser(
+        "dashboard",
+        help="jalankan API + buka /dashboard (sama seperti serve)",
+    )
+    p_dash.add_argument("--port", type=int)
+    p_dash.set_defaults(func=cmd_dashboard)
 
     sub.add_parser("bot", help="Telegram polling").set_defaults(func=cmd_bot)
     sub.add_parser("telegram-init", help="buat .env + panduan BotFather").set_defaults(
@@ -488,6 +661,21 @@ def main() -> int:
     sub.add_parser("telegram-check", help="uji token + API").set_defaults(
         func=cmd_telegram_check
     )
+    sub.add_parser(
+        "menu-push",
+        help="paksa refresh tombol menu + daftar perintah di Telegram",
+    ).set_defaults(func=cmd_menu_push)
+    sub.add_parser("wa-check", help="cek WAHA + nomor WhatsApp diizinkan").set_defaults(
+        func=cmd_wa_check
+    )
+    sub.add_parser(
+        "wa-bot",
+        help="bot WhatsApp (WAHA polling) → API lokal",
+    ).set_defaults(func=cmd_wa_bot)
+    sub.add_parser(
+        "wa-menu-push",
+        help="kirim menu Berichtsheft ke nomor WhatsApp Anda",
+    ).set_defaults(func=cmd_wa_menu_push)
     sub.add_parser("gemini-check", help="uji Gemini API key").set_defaults(
         func=cmd_gemini_check
     )
@@ -525,6 +713,54 @@ def main() -> int:
     p_exp.add_argument("--to", dest="to_date")
     p_exp.add_argument("-o", "--output")
     p_exp.set_defaults(func=cmd_export)
+
+    p_spull = sub.add_parser(
+        "sync-pull",
+        help="tarik shifts/logs/drafts/katalog dari remote API (Mac via tunnel)",
+    )
+    p_spull.add_argument(
+        "--url",
+        help="base URL remote (default: BERICHTSHEFT_REMOTE_API / sync_config)",
+    )
+    p_spull.add_argument(
+        "--token",
+        help="SYNC_TOKEN atau DASHBOARD_TOKEN (default: env)",
+    )
+    p_spull.add_argument(
+        "--files",
+        action="store_true",
+        help="ikutkan isi lampiran kecil (base64)",
+    )
+    p_spull.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="unduh payload saja, jangan tulis DB lokal",
+    )
+    p_spull.set_defaults(func=cmd_sync_pull)
+
+    p_spush = sub.add_parser(
+        "sync-push",
+        help="dorong shifts/logs/drafts/katalog ke remote API",
+    )
+    p_spush.add_argument("--url", help="base URL remote")
+    p_spush.add_argument("--token", help="SYNC_TOKEN atau DASHBOARD_TOKEN")
+    p_spush.add_argument(
+        "--files",
+        action="store_true",
+        help="ikutkan isi lampiran kecil (base64)",
+    )
+    p_spush.add_argument(
+        "--mode",
+        choices=("merge", "replace"),
+        default="merge",
+        help="strategi apply di remote (default: merge)",
+    )
+    p_spush.set_defaults(func=cmd_sync_push)
+
+    sub.add_parser(
+        "sync-status",
+        help="status sync lokal + remote URL tersimpan",
+    ).set_defaults(func=cmd_sync_status)
 
     args = parser.parse_args()
     return args.func(args)

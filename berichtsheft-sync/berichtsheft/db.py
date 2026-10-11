@@ -10,8 +10,9 @@ from typing import Any
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "berichtsheft.db"
 
 
-def connect(db_path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(db_path))
+def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
+    path = DEFAULT_DB if db_path is None else db_path
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -68,7 +69,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
             code TEXT PRIMARY KEY,
             name_de TEXT,
             keywords_json TEXT,
-            default_activities_json TEXT
+            default_activities_json TEXT,
+            conditions_json TEXT
         );
 
         CREATE TABLE IF NOT EXISTS attachments (
@@ -100,6 +102,10 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     ):
         if col not in cols:
             conn.execute(f"ALTER TABLE attachments ADD COLUMN {col} {typ}")
+
+    area_cols = {row[1] for row in conn.execute("PRAGMA table_info(work_areas)")}
+    if "conditions_json" not in area_cols:
+        conn.execute("ALTER TABLE work_areas ADD COLUMN conditions_json TEXT")
 
 
 def upsert_template(
@@ -217,6 +223,48 @@ def work_logs_for_date(conn: sqlite3.Connection, date: str) -> list[sqlite3.Row]
     )
 
 
+def recent_work_logs(conn: sqlite3.Connection, limit: int = 30) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM work_logs ORDER BY created_at DESC, id DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def recent_drafts(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM draft_entries ORDER BY generated_at DESC, id DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def recent_attachments(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM attachments ORDER BY created_at DESC, id DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def list_shifts(conn: sqlite3.Connection, limit: int = 200) -> list[sqlite3.Row]:
+    return list(
+        conn.execute(
+            "SELECT * FROM shifts ORDER BY date DESC LIMIT ?",
+            (limit,),
+        )
+    )
+
+
+def delete_shift(conn: sqlite3.Connection, date: str) -> bool:
+    cur = conn.execute("DELETE FROM shifts WHERE date = ?", (date,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
 def set_approval(
     conn: sqlite3.Connection,
     date: str,
@@ -247,21 +295,26 @@ def upsert_area(
     name_de: str,
     keywords: list[str],
     default_activities: list[str],
+    conditions: list[dict[str, Any]] | None = None,
 ) -> None:
     conn.execute(
         """
-        INSERT INTO work_areas (code, name_de, keywords_json, default_activities_json)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO work_areas (
+            code, name_de, keywords_json, default_activities_json, conditions_json
+        )
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(code) DO UPDATE SET
             name_de=excluded.name_de,
             keywords_json=excluded.keywords_json,
-            default_activities_json=excluded.default_activities_json
+            default_activities_json=excluded.default_activities_json,
+            conditions_json=excluded.conditions_json
         """,
         (
             code,
             name_de,
             json.dumps(keywords, ensure_ascii=False),
             json.dumps(default_activities, ensure_ascii=False),
+            json.dumps(conditions or [], ensure_ascii=False),
         ),
     )
     conn.commit()

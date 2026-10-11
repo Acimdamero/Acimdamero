@@ -1,5 +1,9 @@
 # WAHA API — Pelajaran & Integrasi Automation Hub
 
+> **Berichtsheft WhatsApp bot** (WAHA + allowlist + menu) lives in the Berichtsheft tree:
+> [`../../berichtsheft-sync/docs/WHATSAPP.md`](../../berichtsheft-sync/docs/WHATSAPP.md).
+> This file documents WAHA for the Automation Hub; do not duplicate Berichtsheft runbooks here.
+
 > **Catatan:** Anda menulis "API wafa" — yang dimaksud hampir pasti **[WAHA](https://waha.devlike.pro/)** (**W**hats**A**pp **H**TTP **A**PI), gateway self-hosted untuk otomatisasi WhatsApp via REST.
 
 ---

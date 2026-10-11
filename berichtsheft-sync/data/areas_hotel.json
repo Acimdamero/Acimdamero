@@ -29,6 +29,23 @@
       ]
     },
     {
+      "code": "Rezeption",
+      "name_de": "Rezeption / Empfang",
+      "keywords": [
+        "rezeption",
+        "empfang",
+        "check-in",
+        "check-out",
+        "reservierung",
+        "gäste",
+        "telefon",
+        "rez"
+      ],
+      "default_activities_de": [
+        "Empfangsdienst mit Check-in, Check-out und Reservierungen"
+      ]
+    },
+    {
       "code": "Housekeeping",
       "name_de": "Housekeeping",
       "keywords": [
